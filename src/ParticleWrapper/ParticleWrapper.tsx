@@ -13,6 +13,7 @@ interface ParticleWrapperProps {
     onStart?: () => void;
     onEnd?: () => void;
 
+    timeMaskGenerator?: (width: number, height: number) => {mask: number[][], timeArray: number[]}; // opcjonalna funkcja do generowania niestandardowych czasów dla timerMask, jeśli chcesz mieć większą kontrolę nad tym, kiedy poszczególne cząsteczki mają się pojawiać
     particleInitialState: (particle: Particle) => Particle;
     particleEffect: (particle: Particle, deltaTime: number) => Particle;
 }
@@ -29,6 +30,7 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
     config: userConfig,
     onStart = () => { },
     onEnd = () => { },
+    timeMaskGenerator,
     particleInitialState,
     particleEffect,
 }, ref) => {
@@ -76,20 +78,27 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
             const cols = Math.ceil(imgWidth / pixelWidth);
             const rows = Math.ceil(imgHeight / pixelHeight);
 
-            const timeArray: number[] = [];
+            if(timeMaskGenerator !== undefined) {
+                const { mask, timeArray } = timeMaskGenerator(cols, rows);
+                timerMaskRef.current = mask;
+                timeArrayRef.current = timeArray.sort((a, b) => a - b);
+            } else {
 
-            //logika renderowania maski z bombami (kiedy ma się pojawić cząsteczka, a kiedy nie)
-            for (let x = 0; x < cols; x++) {
-                timerMaskRef.current[x] = [];
-                for (let y = 0; y < rows; y++) {
-                    timerMaskRef.current[x][y] = Math.random(); // losowy czas od 0 do 1 sekund, po którym cząsteczka zacznie się rozpadać
-                    if (timeArray.find(t => t === timerMaskRef.current[x][y]) === undefined) {
-                        timeArray.push(timerMaskRef.current[x][y]);
+                const timeArray: number[] = [];
+
+                //logika renderowania maski z bombami (kiedy ma się pojawić cząsteczka, a kiedy nie)
+                for (let x = 0; x < cols; x++) {
+                    timerMaskRef.current[x] = [];
+                    for (let y = 0; y < rows; y++) {
+                        timerMaskRef.current[x][y] = Math.random(); // losowy czas od 0 do 1 sekund, po którym cząsteczka zacznie się rozpadać
+                        if (timeArray.find(t => t === timerMaskRef.current[x][y]) === undefined) {
+                            timeArray.push(timerMaskRef.current[x][y]);
+                        }
                     }
                 }
+                const sortedTimeArray = timeArray.sort((a, b) => a - b);
+                timeArrayRef.current = sortedTimeArray;
             }
-            const sortedTimeArray = timeArray.sort((a, b) => a - b);
-            timeArrayRef.current = sortedTimeArray;
 
             const newParticlesList: Particle[] = [];
 
@@ -148,6 +157,8 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
 
             particles.current = newParticlesList;
 
+            const sortedTimeArray = timeArrayRef.current.sort((a, b) => a - b);
+
             //logika renderowania maski 
             const maskCanvas = document.createElement("canvas");
             maskCanvas.width = cols;
@@ -172,7 +183,7 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
         } catch (err) {
             console.error("html-to-image: nie udało się wyrenderować elementu", err);
         }
-    }, [config.maxParticles, particleInitialState]);
+    }, [config.maxParticles, particleInitialState, timeMaskGenerator]);
 
     const drawParticles = useCallback((elapsedTime: number) => {
         const canvas = canvasRef.current;
