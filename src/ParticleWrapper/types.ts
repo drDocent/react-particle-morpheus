@@ -38,3 +38,7 @@ export interface Particle {
     particleStyle: ParticleStyle; // Właściwości stylu cząsteczki (przezroczystość, sprite, itp.)
     particleLife: ParticleLife; // Właściwości życia cząsteczki (wiek, czas życia, itp.)
 }
+
+export type ParticleEffect = (particle: Particle, deltaTime: number) => Particle;
+export type ParticleInitialState = (particle: Particle) => Particle;
+export type TimeMaskGenerator = (width: number, height: number) => { mask: number[][], timeArray: number[] };

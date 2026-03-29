@@ -1,24 +1,5 @@
-export type TimeMaskGenerator = (width: number, height: number) => { mask: number[][]; timeArray: number[] };
-
+import type { TimeMaskGenerator } from "./types";
 const roundTimeDelay = (delay: number, bins: number = 50) => Math.round(delay * bins) / bins;
-
-export const diagonalMask: TimeMaskGenerator = (width, height) => {
-    const uniqueTimes = new Set<number>();
-    const mask: number[][] = [];
-    const maxDistance = width + height - 2;
-
-    for (let x = 0; x < width; x++) {
-        const col: number[] = [];
-        for (let y = 0; y < height; y++) {
-            const distance = x + y;
-            const timeDelay = maxDistance === 0 ? 0 : roundTimeDelay(distance / maxDistance);
-            uniqueTimes.add(timeDelay);
-            col.push(timeDelay);
-        }
-        mask.push(col);
-    }
-    return { mask, timeArray: Array.from(uniqueTimes).sort((a, b) => a - b) };
-}
 
 export const leftToRightMask: TimeMaskGenerator = (width, height) => {
     const uniqueTimes = new Set<number>();
@@ -110,4 +91,49 @@ export const sandMask: TimeMaskGenerator = (width, height) => {
         isLeftToRight = !isLeftToRight; // Odwrócenie kierunku fali co blok
     }
     return { mask, timeArray: Array.from(uniqueTimes).sort((a, b) => a - b) };
+}
+
+export type CornerDirection = "left-top" | "left-bottom" | "right-top" | "right-bottom";
+
+export const createDiagonalMask = (direction: CornerDirection): TimeMaskGenerator => {
+    return (width: number, height: number) => {
+        const uniqueTimes = new Set<number>();
+        const mask: number[][] = [];
+        const maxDistance = width + height - 2;
+
+        for (let x = 0; x < width; x++) {
+            const col: number[] = [];
+            for (let y = 0; y < height; y++) {
+                let distance = 0;
+                switch (direction) {
+                    case "left-top":
+                        distance = x + y;
+                        break;
+                    case "right-top":
+                        distance = (width - 1 - x) + y;
+                        break;
+                    case "left-bottom":
+                        distance = x + (height - 1 - y);
+                        break;
+                    case "right-bottom":
+                        distance = (width - 1 - x) + (height - 1 - y);
+                        break;
+                }
+                const timeDelay = maxDistance === 0 ? 0 : roundTimeDelay(distance / maxDistance);
+                uniqueTimes.add(timeDelay);
+                col.push(timeDelay);
+            }
+            mask.push(col);
+        }
+        return { mask, timeArray: Array.from(uniqueTimes).sort((a, b) => a - b) };
+    };
+};
+
+export const MasksGenerators = {
+    leftToRight: leftToRightMask,
+    rightToLeft: rightToLeftMask,
+    topToBottom: topToBottomMask,
+    bottomToTop: bottomToTopMask,
+    sand: sandMask,
+    diagonal: createDiagonalMask,
 }

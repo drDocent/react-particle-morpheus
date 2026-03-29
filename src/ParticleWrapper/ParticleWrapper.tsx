@@ -8,10 +8,13 @@ interface ParticleWrapperProps {
     config?: {
         maxParticles?: number;
         fps?: number;
+        rounded?: boolean;
     };
 
     onStart?: () => void;
+    onShatterFinished?: () => void; // wywoływane, gdy orginalny komponent będzie w pełni rozbity na cząsteczki
     onEnd?: () => void;
+    onReset?: () => void;
 
     timeMaskGenerator?: (width: number, height: number) => {mask: number[][], timeArray: number[]}; // opcjonalna funkcja do generowania niestandardowych czasów dla timerMask, jeśli chcesz mieć większą kontrolę nad tym, kiedy poszczególne cząsteczki mają się pojawiać
     particleInitialState: (particle: Particle) => Particle;
@@ -30,6 +33,8 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
     config: userConfig,
     onStart = () => { },
     onEnd = () => { },
+    onReset = () => { },
+    onShatterFinished = () => { },
     timeMaskGenerator,
     particleInitialState,
     particleEffect,
@@ -49,10 +54,16 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
 
     const particles = useRef<Particle[]>([]);
     const animationFrameRef = useRef<number>(0);
+    
+    // Zmienne do śledzenia stanu postępu animacji i maski po zatrzymaniu (stop/start)
+    const elapsedTimeRef = useRef<number>(0);
+    const lastMaskIndexRef = useRef<number>(0);
+    const shatterFinishedCalledRef = useRef<boolean>(false);
 
     const config = {
         maxParticles: userConfig?.maxParticles ?? 2000,
         fps: userConfig?.fps ?? 120,
+        rounded: userConfig?.rounded ?? false,
     };
 
     // Renderuje children do offscreen canvas za pomocą html-to-image i tworzy listę cząsteczek
@@ -229,45 +240,64 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
         const interval = 1000 / config.fps;
         let running = true;
 
-        let lastMaskIndex = 0;
-        let animationStartTime: number | null = null;
+        let lastFrameTime: number | null = null;
 
         function frame(currentTime: number) {
             if (!running) return;
             animationFrameRef.current = requestAnimationFrame(frame);
 
             // Inicjalizujemy czas startu, żeby wiedzieć ile minęło sekund
-            if (animationStartTime === null) {
-                animationStartTime = currentTime;
+            if (lastFrameTime === null) {
+                lastFrameTime = currentTime;
             }
             
-            const elapsedTime = (currentTime - animationStartTime) / 1000; // sekundy
+            const frameDeltaTime = (currentTime - lastFrameTime) / 1000; // sekundy
+            lastFrameTime = currentTime;
             
-            // Podmiana maski z cache
-            if (childrenRef.current && lastMaskIndex < timeArrayRef.current.length) {
+            // Dodajemy czas jaki upłynął między tą a poprzednią klatką
+            elapsedTimeRef.current += frameDeltaTime;
+            const elapsedTime = elapsedTimeRef.current;
+            
+            // Podmiana maski z cache (z opóźnieniem "o jeden krok do tyłu")
+            if (childrenRef.current && timeArrayRef.current.length > 0 && lastMaskIndexRef.current <= timeArrayRef.current.length) {
                 let updatedMask = false;
+                
                 // Przesuwamy indeks tak długo, jak elapsed łapie się w progi z timeArray
-                while (lastMaskIndex < timeArrayRef.current.length && elapsedTime >= timeArrayRef.current[lastMaskIndex]) {
-                    lastMaskIndex++;
+                while (lastMaskIndexRef.current < timeArrayRef.current.length && elapsedTime >= timeArrayRef.current[lastMaskIndexRef.current]) {
+                    lastMaskIndexRef.current++;
                     updatedMask = true;
                 }
                 
-                if (updatedMask && lastMaskIndex > 0) {
-                    const maskDataUrl = elementMaskRef.current[lastMaskIndex - 1];
+                // Ponieważ opóźniamy maskę o jeden krok (nakładamy poprzednią), musimy dorobić sztuczny krok, 
+                // aby nałożyć finalną warstwę wycięcia. Dodajemy małe opóźnienie (np. 0.05 sekundy) od ostatniej fali.
+                if (lastMaskIndexRef.current === timeArrayRef.current.length && elapsedTime >= timeArrayRef.current[lastMaskIndexRef.current - 1] + 0.05) {
+                    lastMaskIndexRef.current++;
+                    updatedMask = true;
+                }
+                
+                if (updatedMask && lastMaskIndexRef.current > 1) {
+                    // lastMaskIndexRef.current - 2 oznacza przeskoczenie "na poprzednią potencjalną maskę"
+                    const maskDataUrl = elementMaskRef.current[lastMaskIndexRef.current - 2];
 
-                    // Zastosuj styl maski na właściwym elemencie (dzieciach)
-                    const targetEl = childrenRef.current;
-                    
-                    // Standaryzowane propercje
-                    targetEl.style.maskImage = `url(${maskDataUrl})`;
-                    targetEl.style.maskSize = "100% 100%";
-                    targetEl.style.maskRepeat = "no-repeat";
-                    targetEl.style.imageRendering = "pixelated";
-                    
-                    // Rozszerzenia WebKit, niezbędne w niektórych przeglądarkach (Safari, Opera, część Chrome)
-                    targetEl.style.setProperty('-webkit-mask-image', `url(${maskDataUrl})`);
-                    targetEl.style.setProperty('-webkit-mask-size', '100% 100%');
-                    targetEl.style.setProperty('-webkit-mask-repeat', 'no-repeat');
+                    if (maskDataUrl) {
+                        // Zastosuj styl maski na właściwym elemencie (dzieciach)
+                        const targetEl = childrenRef.current;
+                        
+                        // Standaryzowane propercje
+                        targetEl.style.maskImage = `url(${maskDataUrl})`;
+                        targetEl.style.maskSize = "100% 100%";
+                        targetEl.style.maskRepeat = "no-repeat";
+                        targetEl.style.imageRendering = "pixelated";
+                        
+                        // Rozszerzenia WebKit, niezbędne w niektórych przeglądarkach (Safari, Opera, część Chrome)
+                        targetEl.style.setProperty('-webkit-mask-image', `url(${maskDataUrl})`);
+                        targetEl.style.setProperty('-webkit-mask-size', '100% 100%');
+                        targetEl.style.setProperty('-webkit-mask-repeat', 'no-repeat');
+                    }
+                }
+                if (!shatterFinishedCalledRef.current && lastMaskIndexRef.current > timeArrayRef.current.length) {
+                    onShatterFinished();
+                    shatterFinishedCalledRef.current = true;
                 }
             }
 
@@ -306,13 +336,23 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
         return () => {
             running = false;
             cancelAnimationFrame(animationFrameRef.current);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
         };
-    }, [isRunning, config.fps, particleEffect, drawParticles, onEnd]);
+    }, [isRunning, config.fps, particleEffect, drawParticles, onEnd, onShatterFinished]);
 
     // Inicjalizacja cząsteczek przy montowaniu i zmianie rozmiaru okna
     useEffect(() => {
         if (!childrenRef.current) return;
+        
+        // Zdejmujemy maskę przed wykonaniem zrzutu html-to-image, 
+        // aby nie zapisać w pamięci przycisku, który już zniknął (to powodowało puste, przezroczyste cząsteczki)
+        childrenRef.current.style.maskImage = "none";
+        childrenRef.current.style.setProperty('-webkit-mask-image', 'none');
+        
+        // Przy ponownym generowaniu cząsteczek bezpiecznie resetujemy również czasy
+        elapsedTimeRef.current = 0;
+        lastMaskIndexRef.current = 0;
+        shatterFinishedCalledRef.current = false;
+        
         setupComponent(childrenRef.current);
     }, [setupComponent, windowSize]);
 
@@ -334,6 +374,10 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
             if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         }
         
+        elapsedTimeRef.current = 0;
+        lastMaskIndexRef.current = 0;
+        shatterFinishedCalledRef.current = false;
+        
         for (let i = 0; i < particles.current.length; i++) {
             const p = particles.current[i];
             p.x = p.originX;
@@ -342,6 +386,9 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
             p.particlePhysics.velocityY = 0;
             p.particlePhysics.accelerationX = 0;
             p.particlePhysics.accelerationY = 0;
+            p.particleLife.isDead = false;
+            p.particleLife.age = 0;
+            p.particleStyle.opacity = 1;
             particles.current[i] = particleInitialState(p);
         }
     }
@@ -351,16 +398,20 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
             setIsRunning(false);
             if (childrenRef.current) {
                 childrenRef.current.style.maskImage = "none";
+                childrenRef.current.style.setProperty('-webkit-mask-image', 'none');
             }
             resetParticles();
+            onReset();
         },
         hardReset: () => {
             setIsRunning(false);
             if (childrenRef.current) {
                 childrenRef.current.style.maskImage = "none";
+                childrenRef.current.style.setProperty('-webkit-mask-image', 'none');
                 const element = childrenRef.current;
                 setupComponent(element);
             }
+            onReset();
         },
         start: () => {
             onStart();
