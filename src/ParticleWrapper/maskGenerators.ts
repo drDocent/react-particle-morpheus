@@ -95,7 +95,7 @@ export const sandMask: TimeMaskGenerator = (width, height) => {
 
 export type CornerDirection = "left-top" | "left-bottom" | "right-top" | "right-bottom";
 
-export const createDiagonalMask = (direction: CornerDirection): TimeMaskGenerator => {
+const createDiagonalMask = (direction: CornerDirection): TimeMaskGenerator => {
     return (width: number, height: number) => {
         const uniqueTimes = new Set<number>();
         const mask: number[][] = [];
@@ -128,6 +128,11 @@ export const createDiagonalMask = (direction: CornerDirection): TimeMaskGenerato
         return { mask, timeArray: Array.from(uniqueTimes).sort((a, b) => a - b) };
     };
 };
+
+export const topLeftDiagonalMask = createDiagonalMask("left-top");
+export const topRightDiagonalMask = createDiagonalMask("right-top");
+export const bottomLeftDiagonalMask = createDiagonalMask("left-bottom");
+export const bottomRightDiagonalMask = createDiagonalMask("right-bottom");
 
 export const centerOutMask: TimeMaskGenerator = (width, height) => {
     const uniqueTimes = new Set<number>();
@@ -228,8 +233,11 @@ export const MasksGenerators = {
     rightToLeft: rightToLeftMask,
     topToBottom: topToBottomMask,
     bottomToTop: bottomToTopMask,
+    topLeftDiagonal: topLeftDiagonalMask,
+    topRightDiagonal: topRightDiagonalMask,
+    bottomLeftDiagonal: bottomLeftDiagonalMask,
+    bottomRightDiagonal: bottomRightDiagonalMask,
     sand: sandMask,
-    diagonal: createDiagonalMask,
     centerOut: centerOutMask,
     edgesIn: edgesInMask,
     splitHorizontal: splitHorizontalMask,

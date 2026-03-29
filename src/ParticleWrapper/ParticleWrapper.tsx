@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
 import { toCanvas } from "html-to-image";
-import type { Particle, ParticleLife, ParticleStyle, ParticlePhysics } from "./types";
+import type { Particle } from "./types";
+import { MasksGenerators } from "./maskGenerators";
+import { ParticleInitialStates } from "./particleInitialStates";
+import { ParticleEffects } from "./particleEffects";
 
 interface ParticleWrapperProps {
     children: React.ReactNode;
@@ -16,9 +19,9 @@ interface ParticleWrapperProps {
     onEnd?: () => void;
     onReset?: () => void;
 
-    timeMaskGenerator?: (width: number, height: number) => {mask: number[][], timeArray: number[]}; // opcjonalna funkcja do generowania niestandardowych czasów dla timerMask, jeśli chcesz mieć większą kontrolę nad tym, kiedy poszczególne cząsteczki mają się pojawiać
-    particleInitialState: (particle: Particle) => void;
-    particleEffect: (particle: Particle, deltaTime: number) => void;
+    timeMaskGenerator: keyof typeof MasksGenerators; // klucz generatora maski z obiektu MasksGenerators
+    particleInitialState: keyof typeof ParticleInitialStates; // klucz stanu początkowego z obiektu ParticleInitialStates
+    particleEffect: keyof typeof ParticleEffects; // klucz efektu cząsteczek z obiektu ParticleEffects
 }
 
 export interface ParticleWrapperRef {
@@ -28,7 +31,7 @@ export interface ParticleWrapperRef {
     stop: () => void;
 }
 
-export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
+const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
     children,
     config: userConfig,
     onStart = () => { },
@@ -51,6 +54,10 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
     const timerMaskRef = useRef<number[][]>([]);
     const elementMaskRef = useRef<string[]>([]);
     const timeArrayRef = useRef<number[]>([]);
+    const workerRef = useRef<Worker | null>(null);
+    const workerRequestIdRef = useRef<number>(0);
+    const maskObjectUrlsRef = useRef<string[]>([]);
+    const setupSequenceRef = useRef<number>(0);
 
     const particles = useRef<Particle[]>([]);
     const animationFrameRef = useRef<number>(0);
@@ -66,9 +73,23 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
         rounded: userConfig?.rounded ?? false,
     };
 
+    const resolvedParticleInitialState = ParticleInitialStates[particleInitialState];
+    const resolvedParticleEffect = ParticleEffects[particleEffect];
+
+    const blobToDataUrl = useCallback((blob: Blob) => {
+        return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(reader.error ?? new Error("Nie udało się odczytać blob jako data URL"));
+            reader.readAsDataURL(blob);
+        });
+    }, []);
+
     // Renderuje children do offscreen canvas za pomocą html-to-image i tworzy listę cząsteczek
     const setupComponent = useCallback(async (element: HTMLDivElement) => {
         const rect = element.getBoundingClientRect();
+        const setupSequence = setupSequenceRef.current + 1;
+        setupSequenceRef.current = setupSequence;
 
         try {
             // html-to-image toCanvas zwraca HTMLCanvasElement z wyrenderowanym DOM-em
@@ -83,119 +104,88 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
             const imgWidth = canvas.width;
             const imgHeight = canvas.height;
 
-            const pixelWidth = Math.ceil(Math.sqrt((imgWidth * imgHeight) / config.maxParticles));
-            const pixelHeight = Math.ceil((imgWidth * imgHeight) / config.maxParticles / pixelWidth);
-
-            const cols = Math.ceil(imgWidth / pixelWidth);
-            const rows = Math.ceil(imgHeight / pixelHeight);
-
-            if(timeMaskGenerator !== undefined) {
-                const { mask, timeArray } = timeMaskGenerator(cols, rows);
-                timerMaskRef.current = mask;
-                timeArrayRef.current = timeArray.sort((a, b) => a - b);
-            } else {
-
-                const timeArray: number[] = [];
-
-                //logika renderowania maski z bombami (kiedy ma się pojawić cząsteczka, a kiedy nie)
-                for (let x = 0; x < cols; x++) {
-                    timerMaskRef.current[x] = [];
-                    for (let y = 0; y < rows; y++) {
-                        timerMaskRef.current[x][y] = Math.random(); // losowy czas od 0 do 1 sekund, po którym cząsteczka zacznie się rozpadać
-                        if (timeArray.find(t => t === timerMaskRef.current[x][y]) === undefined) {
-                            timeArray.push(timerMaskRef.current[x][y]);
-                        }
-                    }
-                }
-                const sortedTimeArray = timeArray.sort((a, b) => a - b);
-                timeArrayRef.current = sortedTimeArray;
-            }
-
-            const newParticlesList: Particle[] = [];
-
-            let colIndex = 0;
-            for (let x = 0; x < imgWidth; x += pixelWidth) {
-                let rowIndex = 0;
-                for (let y = 0; y < imgHeight; y += pixelHeight) {
-                    const originX = rect.x + x;
-                    const originY = rect.y + y;
-
-                    const pWidth = Math.min(pixelWidth, rect.x + rect.width - originX);
-                    const pHeight = Math.min(pixelHeight, rect.y + rect.height - originY);
-
-                    const particlePhysics: ParticlePhysics = {
-                        velocityX: 0,
-                        velocityY: 0,
-                        accelerationX: 0,
-                        accelerationY: 0,
-                    };
-
-                    const particleStyle: ParticleStyle = {
-                        opacity: 1,
-                        sprite: {
-                            sourceX: x,
-                            sourceY: y,
-                        },
-                    };
-
-                    const spawnTime = timerMaskRef.current[colIndex][rowIndex];
-
-                    const particleLife: ParticleLife = {
-                        spawnTime,
-                        age: 0,
-                        lifetime: Infinity,
-                        isDead: false,
-                    };
-
-                    const particle: Particle = {
-                        id: crypto.randomUUID(),
-                        originX,
-                        originY,
-                        x: originX,
-                        y: originY,
-                        width: pWidth,
-                        height: pHeight,
-                        particlePhysics,
-                        particleStyle,
-                        particleLife,
-                    };
-
-                    particleInitialState(particle);
-                    newParticlesList.push(particle);
-                    rowIndex++;
-                }
-                colIndex++;
-            }
-
-            particles.current = newParticlesList;
-
-            const sortedTimeArray = timeArrayRef.current.sort((a, b) => a - b);
-
-            //logika renderowania maski 
-            const maskCanvas = document.createElement("canvas");
-            maskCanvas.width = cols;
-            maskCanvas.height = rows;
-            const maskCtx = maskCanvas.getContext("2d", { willReadFrequently: true });
-            if (!maskCtx) return;
+            maskObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+            maskObjectUrlsRef.current = [];
             elementMaskRef.current = [];
-            maskCtx.fillStyle = "black";
-            maskCtx.fillRect(0, 0, cols, rows); // Zaczynamy od pełnej maski (przycisk jest cały widoczny)
 
-            for(let i = 0; i < sortedTimeArray.length; i++) {
-                const t = sortedTimeArray[i];
-                for (let x = 0; x < cols; x++) {
-                    for (let y = 0; y < rows; y++) {
-                        if(timerMaskRef.current[x][y] <= t) {
-                            maskCtx.clearRect(x, y, 1, 1); // Czas minął -> usuwamy piksel z maski (przezroczysty)
-                        }                        
+            const requestId = workerRequestIdRef.current + 1;
+            workerRequestIdRef.current = requestId;
+
+            workerRef.current?.terminate();
+            workerRef.current = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
+
+            const worker = workerRef.current;
+            const workerData = await new Promise<{
+                requestId: number;
+                timeMask: number[][];
+                timeArray: number[];
+                maskBlobs: Blob[];
+                particles: Particle[];
+            }>((resolve, reject) => {
+                let finished = false;
+
+                const cleanup = () => {
+                    worker.removeEventListener("message", handleMessage);
+                    worker.removeEventListener("error", handleError);
+                };
+
+                const handleMessage = (event: MessageEvent) => {
+                    if (finished) return;
+                    const data = event.data;
+
+                    if (!data || data.type !== "SUCCESS" || data.requestId !== requestId) {
+                        return;
                     }
-                }
-                elementMaskRef.current.push(maskCanvas.toDataURL('image/png'));
+
+                    finished = true;
+                    cleanup();
+                    resolve(data);
+                };
+
+                const handleError = (errorEvent: ErrorEvent) => {
+                    if (finished) return;
+                    finished = true;
+                    cleanup();
+                    reject(errorEvent.error ?? new Error(errorEvent.message));
+                };
+
+                worker.addEventListener("message", handleMessage);
+                worker.addEventListener("error", handleError);
+                worker.postMessage({
+                    requestId,
+                    width: imgWidth,
+                    height: imgHeight,
+                    rectX: rect.x,
+                    rectY: rect.y,
+                    maxParticles: config.maxParticles,
+                    maskGeneratorName: timeMaskGenerator,
+                    particleInitialStateName: particleInitialState,
+                });
+            });
+
+            if (setupSequence !== setupSequenceRef.current || requestId !== workerRequestIdRef.current) {
+                return;
             }
+
+            timerMaskRef.current = workerData.timeMask;
+            timeArrayRef.current = workerData.timeArray;
+            particles.current = workerData.particles;
+
+            elementMaskRef.current = await Promise.all(workerData.maskBlobs.map(blobToDataUrl));
+            
         } catch (err) {
             console.error("html-to-image: nie udało się wyrenderować elementu", err);
         }
-    }, [config.maxParticles, particleInitialState, timeMaskGenerator]);
+    }, [blobToDataUrl, config.maxParticles, timeMaskGenerator, particleInitialState]);
+
+    useEffect(() => {
+        return () => {
+            workerRef.current?.terminate();
+            workerRef.current = null;
+            maskObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+            maskObjectUrlsRef.current = [];
+        };
+    }, []);
 
     const drawParticles = useCallback((elapsedTime: number) => {
         const canvas = canvasRef.current;
@@ -316,7 +306,7 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
                 allDead = false;
 
                 if (elapsedTime >= p.particleLife.spawnTime) {
-                    particleEffect(p, Math.min(delta / 1000, 0.1));
+                    resolvedParticleEffect(p, Math.min(delta / 1000, 0.1));
                 }
             }
 
@@ -335,7 +325,7 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
             running = false;
             cancelAnimationFrame(animationFrameRef.current);
         };
-    }, [isRunning, config.fps, particleEffect, drawParticles, onEnd, onShatterFinished]);
+    }, [isRunning, config.fps, resolvedParticleEffect, drawParticles, onEnd, onShatterFinished]);
 
     // Inicjalizacja cząsteczek przy montowaniu i zmianie rozmiaru okna
     useEffect(() => {
@@ -387,7 +377,7 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
             p.particleLife.isDead = false;
             p.particleLife.age = 0;
             p.particleStyle.opacity = 1;
-            particleInitialState(p);
+            resolvedParticleInitialState(p);
         }
     }
 
@@ -434,3 +424,6 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
         </div>
     );
 });
+
+export { ParticleWrapper };
+export default ParticleWrapper;

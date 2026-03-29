@@ -1,11 +1,9 @@
 import { useState, useRef } from "react";
-import { ParticleWrapper, type ParticleWrapperRef } from "./ParticleWrapper";
+import ParticleWrapper, { type ParticleWrapperRef } from "./ParticleWrapper";
 
 import { MasksGenerators } from "./maskGenerators";
 import { ParticleInitialStates } from "./particleInitialStates";
 import { ParticleEffects } from "./particleEffects";
-
-import type { TimeMaskGenerator, ParticleEffect, ParticleInitialState } from "./types";
 
 import { DevTools } from "./DevTools";
 
@@ -14,9 +12,9 @@ export function ParticleWrapperDev({children}: {children: React.ReactNode}) {
         fps: 120,
         maxParticles: 2000,
     });
-    const [timeMaskGenerator, setTimeMaskGenerator] = useState<TimeMaskGenerator>(() => MasksGenerators.diagonal('left-top'));
-    const [particleInitialState, setParticleInitialState] = useState<ParticleInitialState>(() => ParticleInitialStates.explosion);
-    const [particleEffect, setParticleEffect] = useState<ParticleEffect>(() => ParticleEffects.gravitationBottom);
+    const [timeMaskGenerator, setTimeMaskGenerator] = useState<keyof typeof MasksGenerators>("topLeftDiagonal");
+    const [particleInitialState, setParticleInitialState] = useState<keyof typeof ParticleInitialStates>("explosion");
+    const [particleEffect, setParticleEffect] = useState<keyof typeof ParticleEffects>("gravitationBottom");
     
 
     const particleWrapperRef = useRef<ParticleWrapperRef>(null);

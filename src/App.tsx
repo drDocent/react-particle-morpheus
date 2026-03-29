@@ -1,89 +1,17 @@
-import { useRef, useCallback, useState } from 'react'
-import { type Particle, ParticleWrapper, type ParticleWrapperRef, leftToRightMask, rightToLeftMask, topToBottomMask, bottomToTopMask, sandMask, type TimeMaskGenerator, ParticleWrapperDev } from './ParticleWrapper'
-import { createDiagonalMask } from './ParticleWrapper/maskGenerators'
+import { useState } from 'react'
+import { ParticleWrapperDev } from './ParticleWrapper'
 import { Trash } from 'lucide-react'
 
 export function App() {
-  const particleWrapperRef = useRef<ParticleWrapperRef>(null)
-  const [maskKey, setMaskKey] = useState<string>('diagonal');
   const [isHovered, setIsHovered] = useState(false);
   const [inputValue, setInputValue] = useState('');
-
-  const masks: Record<string, TimeMaskGenerator> = {
-    leftToRight: leftToRightMask,
-    rightToLeft: rightToLeftMask,
-    topToBottom: topToBottomMask,
-    bottomToTop: bottomToTopMask,
-    sand: sandMask,
-    "left-top": createDiagonalMask("left-top"),
-    "left-bottom": createDiagonalMask("left-bottom"),
-    "right-top": createDiagonalMask("right-top"),
-    "right-bottom": createDiagonalMask("right-bottom"),
-  };
-
-  const applyParticleEffect = useCallback((particle: Particle, deltaTime: number): Particle => {
-    // Płynny ruch wynikający z prędkości, brak losowego trzęsienia
-    particle.x += particle.particlePhysics.velocityX * deltaTime
-    particle.y += particle.particlePhysics.velocityY * deltaTime
-
-    // Przyspieszenie (grawitacja i ewentualny opór powietrza dla płynności)
-    const airResistance = 0.98; // Tłumi prędkość cząsteczek z czasem, by nie leciały w nieskończoność z taką samą siłą
-    particle.particlePhysics.velocityX *= airResistance;
-    particle.particlePhysics.velocityY *= airResistance;
-
-    // Aplikowanie grawitacji
-    particle.particlePhysics.velocityX += particle.particlePhysics.accelerationX * deltaTime
-    particle.particlePhysics.velocityY += particle.particlePhysics.accelerationY * deltaTime
-
-    // Rotacja poprzez nieznaczną modyfikację alpha / zanikanie wraz z upływem życia
-    particle.particleStyle.opacity = Math.max(0, particle.particleLife.lifetime / 3);
-
-    particle.particleLife.lifetime -= deltaTime
-
-    if (particle.particleLife.lifetime <= 0) {
-      particle.particleLife.isDead = true
-    }
-
-    return particle
-  }, [])
-
-  const particleInitialState = useCallback((particle: Particle): Particle => {
-    // Losowy kąt i kierunek eksplozji – bardziej sferyczny i naturalny rozpad
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 200 + 50;
-
-    return {
-      ...particle,
-      particlePhysics: {
-        velocityX: Math.cos(angle) * speed,
-        velocityY: Math.sin(angle) * speed - 150, // Dodatkowy "kop" w górę przy starcie
-        accelerationX: 0,
-        accelerationY: 400, // Silniejsza grawitacja ściągająca cząsteczki płynnie w dół po łuku
-      },
-      particleLife: {
-        spawnTime: particle.particleLife.spawnTime,
-        age: 0,
-        lifetime: 1.5 + Math.random() * 1.5, // Krótszy, ale bardziej jednolity żywot
-        isDead: false,
-      },
-    }
-  }, [])
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', flexDirection: 'row', alignItems: 'center', height: '100vh', backgroundColor: '#f7f9fc', gap: '100px' }}>
 
       {/* Kolumna 1 */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <ParticleWrapperDev
-          // config={{
-          //   fps: 120,
-          //   maxParticles: 3000,
-          // }}
-          // particleInitialState={particleInitialState}
-          // particleEffect={applyParticleEffect}
-          // timeMaskGenerator={masks[maskKey]}
-          // ref={particleWrapperRef}
-        >
+        <ParticleWrapperDev>
           <div
             style={{
               position: 'relative',
@@ -103,10 +31,6 @@ export function App() {
           >
             {/* Trash Button */}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                particleWrapperRef.current?.start();
-              }}
               title="Usuń kartę"
               style={{
                 position: 'absolute',

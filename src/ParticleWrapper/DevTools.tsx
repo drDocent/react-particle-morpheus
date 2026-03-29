@@ -5,8 +5,6 @@ import { MasksGenerators } from "./maskGenerators";
 import { ParticleInitialStates } from "./particleInitialStates";
 import { ParticleEffects } from "./particleEffects";
 
-import type { TimeMaskGenerator, ParticleEffect, ParticleInitialState } from "./types";
-
 interface DevToolsProps {
     config: {
         fps: number;
@@ -17,17 +15,17 @@ interface DevToolsProps {
     stop: () => void;
     hardReset: () => void;
 
-    timeMaskGenerator: TimeMaskGenerator;
-    particleInitialState: ParticleInitialState;
-    particleEffect: ParticleEffect;
+    timeMaskGenerator: keyof typeof MasksGenerators;
+    particleInitialState: keyof typeof ParticleInitialStates;
+    particleEffect: keyof typeof ParticleEffects;
 
     setConfig: React.Dispatch<React.SetStateAction<{
         fps: number;
         maxParticles: number;
     }>>;
-    setTimeMaskGenerator: React.Dispatch<React.SetStateAction<TimeMaskGenerator>>;
-    setParticleInitialState: React.Dispatch<React.SetStateAction<ParticleInitialState>>;
-    setParticleEffect: React.Dispatch<React.SetStateAction<ParticleEffect>>;
+    setTimeMaskGenerator: React.Dispatch<React.SetStateAction<keyof typeof MasksGenerators>>;
+    setParticleInitialState: React.Dispatch<React.SetStateAction<keyof typeof ParticleInitialStates>>;
+    setParticleEffect: React.Dispatch<React.SetStateAction<keyof typeof ParticleEffects>>;
 }
 
 export function DevTools({ config, reset, start, stop, hardReset, timeMaskGenerator, particleInitialState, particleEffect, setConfig, setTimeMaskGenerator, setParticleInitialState, setParticleEffect }: DevToolsProps) {
@@ -198,9 +196,9 @@ export function DevTools({ config, reset, start, stop, hardReset, timeMaskGenera
                             <span className="dev-label">Initial State</span>
                             <select 
                                 className="dev-select"
-                                defaultValue="explosion"
+                                value={particleInitialState}
                                 onChange={(e) => {
-                                    setParticleInitialState(() => ParticleInitialStates[e.target.value as keyof typeof ParticleInitialStates]);
+                                    setParticleInitialState(e.target.value as keyof typeof ParticleInitialStates);
                                 }}
                             >
                                 {Object.keys(ParticleInitialStates).map(key => (
@@ -214,9 +212,9 @@ export function DevTools({ config, reset, start, stop, hardReset, timeMaskGenera
                             <span className="dev-label">Particle Effect</span>
                             <select 
                                 className="dev-select"
-                                defaultValue="gravitationBottom"
+                                value={particleEffect}
                                 onChange={(e) => {
-                                    setParticleEffect(() => ParticleEffects[e.target.value as keyof typeof ParticleEffects]);
+                                    setParticleEffect(e.target.value as keyof typeof ParticleEffects);
                                 }}
                             >
                                 {Object.keys(ParticleEffects).map(key => (
@@ -230,15 +228,9 @@ export function DevTools({ config, reset, start, stop, hardReset, timeMaskGenera
                             <span className="dev-label">Time Mask</span>
                             <select 
                                 className="dev-select"
-                                defaultValue="diagonal-left-top"
+                                value={timeMaskGenerator}
                                 onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val.startsWith('diagonal-')) {
-                                        const dir = val.replace('diagonal-', '');
-                                        setTimeMaskGenerator(() => MasksGenerators.diagonal(dir as any));
-                                    } else {
-                                        setTimeMaskGenerator(() => MasksGenerators[val as keyof Omit<typeof MasksGenerators, 'diagonal'>] as TimeMaskGenerator);
-                                    }
+                                    setTimeMaskGenerator(e.target.value as keyof typeof MasksGenerators);
                                 }}
                             >
                                 <option value="leftToRight">Left To Right</option>
@@ -251,10 +243,10 @@ export function DevTools({ config, reset, start, stop, hardReset, timeMaskGenera
                                 <option value="splitHorizontal">Split Horizontal</option>
                                 <option value="splitVertical">Split Vertical</option>
                                 <option value="random">Random</option>
-                                <option value="diagonal-left-top">Diagonal (Left-Top)</option>
-                                <option value="diagonal-right-top">Diagonal (Right-Top)</option>
-                                <option value="diagonal-left-bottom">Diagonal (Left-Bottom)</option>
-                                <option value="diagonal-right-bottom">Diagonal (Right-Bottom)</option>
+                                <option value="topLeftDiagonal">Diagonal (Left-Top)</option>
+                                <option value="topRightDiagonal">Diagonal (Right-Top)</option>
+                                <option value="bottomLeftDiagonal">Diagonal (Left-Bottom)</option>
+                                <option value="bottomRightDiagonal">Diagonal (Right-Bottom)</option>
                             </select>
                         </div>
 
