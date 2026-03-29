@@ -16,6 +16,7 @@ export interface ParticleStyle {
 }
 
 export interface ParticleLife {
+    spawnTime: number; // Czas, w którym cząsteczka zostanie stworzona
     age: number; // czas życia cząsteczki
     lifetime: number; // maksymalny czas życia cząsteczki
     isDead: boolean; // czy cząsteczka jest martwa
