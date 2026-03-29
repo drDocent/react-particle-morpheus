@@ -7,6 +7,15 @@ export interface ParticleWrapperRef {
     stop: () => void;
 }
 
+export interface ParticlePhysics {
+    velocityX: number;
+    velocityY: number;
+    accelerationX: number;
+    accelerationY: number;
+
+    lifetime?: number;
+}
+
 export interface Particle {
     // Nie trzymamy jedynie x oraz y bo jak się zmienia pozycja buttonu
     // w trakcie animacji to chcemy mieć nad tym kontrolę
@@ -20,12 +29,8 @@ export interface Particle {
     height: number; // Wysokość cząsteczki
     width: number; // Szerokość cząsteczki
 
-    velocityX: number; // Opcjonalna prędkość w osi X
-    velocityY: number; // Opcjonalna prędkość w osi Y
-    accelerationX: number; // Opcjonalne przyspieszenie w osi X
-    accelerationY: number; // Opcjonalne przyspieszenie w osi Y
 
-    lifetime?: number; // Opcjonalna żywotność cząsteczki (np. w sekundach)
+    particlePhysics: ParticlePhysics; // Właściwości fizyczne cząsteczki (prędkość, przyspieszenie, itp.)
 }
 
 interface ParticleWrapperProps {
@@ -35,6 +40,14 @@ interface ParticleWrapperProps {
 
 const maxParticles = 2000;
 const fps = 120;
+
+const initialParticlePhysics: ParticlePhysics = {
+    velocityX: (Math.random() - 0.5) * 100,
+    velocityY: (Math.random() - 0.5) * 100,
+    accelerationX: 0,
+    accelerationY: 100,
+    lifetime: 2 + Math.random() * 3,
+}
 
 export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({ children, applyParticeleEffect}, ref) => {
     const [isRunning, setIsRunning] = useState<boolean>(false)
@@ -47,12 +60,6 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
     const animationFrameId = useRef<number>(0)
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const childrenRef = useRef<HTMLDivElement>(null)
-
-    function test(){
-        const childrenElement = childrenRef.current
-        if (!childrenElement) return
-
-    }
 
     function drawParticles() {
         if (canvasRef.current) {
@@ -70,8 +77,6 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
     function createParticles() {
         const childrenElement = childrenRef.current
         if (!childrenElement) return
-
-        test()
 
         const rect = childrenElement.getBoundingClientRect()
         const x = rect.x
@@ -100,60 +105,47 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
         const particleWidth = w / cols;   // To jest Twoje x
         const particleHeight = h / rows;  // To jest Twoje y
 
-        const computedStyle = window.getComputedStyle(childrenElement);
-
-        // Pobieramy dokładne wartości dla każdego z 4 rogów osobno
-        const getRadius = (val: string) => {
-            const parsed = parseFloat(val);
-            if (isNaN(parsed)) return 0;
-            if (val.includes('%')) {
-                return (parsed / 100) * Math.min(w, h);
-            }
-            return parsed;
-        };
-
-        const rtl = Math.min(getRadius(computedStyle.borderTopLeftRadius), w / 2, h / 2);
-        const rtr = Math.min(getRadius(computedStyle.borderTopRightRadius), w / 2, h / 2);
-        const rbr = Math.min(getRadius(computedStyle.borderBottomRightRadius), w / 2, h / 2);
-        const rbl = Math.min(getRadius(computedStyle.borderBottomLeftRadius), w / 2, h / 2);
-
         const particlesArray: Particle[] = []
 
-        for (let i = 0; i < w; i += particleWidth) {
-            for (let j = 0; j < h; j += particleHeight) {
-                // Testujemy NAJBARDZIEJ WYSUNIĘTE KRAWĘDZIE cząsteczki, żeby żadna
-                // nie wystawała poza przycisk. Zamiast testować jedynie środek particla, 
-                // sprawdzamy, czy w danym rogu "wisi" jakiś niepożądany fragment kwadracika.
+        domtoimage.toPixelData(childrenRef.current).then(function (pixelData) {
+            if (!canvasRef.current) return;
+            const ctx = canvasRef.current.getContext('2d');
+            if (!ctx) return;
 
-                const pLeft = i;
-                const pRight = i + particleWidth;
-                const pTop = j;
-                const pBottom = j + particleHeight;
+            ctx.putImageData(new ImageData(pixelData, w, h), x, y);
 
-                let isInside = true;
+            for(let i = 0; i < cols; i+= particleWidth){
+                for(let j = 0; j < rows; j+= particleHeight){
+                    for(let px = 0; px < particleWidth; px++){
+                        for(let py = 0; py < particleHeight; py++){
+                            const pixelIndex = ((j + py) * w + (i + px)) * 4;
+                            const r = pixelData[pixelIndex];
+                            const g = pixelData[pixelIndex + 1];
+                            const b = pixelData[pixelIndex + 2];
+                            const a = pixelData[pixelIndex + 3];
 
-                // Lewy górny róg
-                if (pLeft < rtl && pTop < rtl) {
-                    if (Math.pow(pLeft - rtl, 2) + Math.pow(pTop - rtl, 2) > Math.pow(rtl, 2)) isInside = false;
-                }
-                // Prawy górny róg
-                if (pRight > w - rtr && pTop < rtr) {
-                    if (Math.pow(pRight - (w - rtr), 2) + Math.pow(pTop - rtr, 2) > Math.pow(rtr, 2)) isInside = false;
-                }
-                // Prawy dolny róg
-                if (pRight > w - rbr && pBottom > h - rbr) {
-                    if (Math.pow(pRight - (w - rbr), 2) + Math.pow(pBottom - (h - rbr), 2) > Math.pow(rbr, 2)) isInside = false;
-                }
-                // Lewy dolny róg
-                if (pLeft < rbl && pBottom > h - rbl) {
-                    if (Math.pow(pLeft - rbl, 2) + Math.pow(pBottom - (h - rbl), 2) > Math.pow(rbl, 2)) isInside = false;
-                }
-
-                if (isInside) {
-                    particlesArray.push({ startX: x + i, startY: y + j, offsetX: 0, offsetY: 0, width: Math.min(particleWidth, w - i), height: Math.min(particleHeight, h - j), velocityX: 0, velocityY: 0, accelerationX: 0, accelerationY: 0, lifetime: Math.random() })
+                            if(a > 0){ // Jeśli piksel nie jest przezroczysty
+                                particlesArray.push({
+                                    startX: x + i,
+                                    startY: y + j,
+                                    offsetX: 0,
+                                    offsetY: 0,
+                                    width: particleWidth,
+                                    height: particleHeight,
+                                    colors: [[`rgba(${r}, ${g}, ${b}, ${a / 255})`]],
+                                    velocityX: (Math.random() - 0.5) * 100, // Przykładowa prędkość X
+                                    velocityY: (Math.random() - 0.5) * 100, // Przykładowa prędkość Y
+                                    accelerationX: 0, // Brak przyspieszenia X
+                                    accelerationY: 100, // Przykładowe przyspieszenie Y (grawitacja)
+                                    lifetime: 2 + Math.random() * 3, // Przykładowa żywotność między 2 a 5 sekund
+                                });
+                            }
+                        }
+                    }
                 }
             }
-        }
+        });
+
         particles.current = particlesArray
         drawParticles()
     }
