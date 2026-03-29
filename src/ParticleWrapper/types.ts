@@ -39,6 +39,6 @@ export interface Particle {
     particleLife: ParticleLife; // Właściwości życia cząsteczki (wiek, czas życia, itp.)
 }
 
-export type ParticleEffect = (particle: Particle, deltaTime: number) => Particle;
-export type ParticleInitialState = (particle: Particle) => Particle;
+export type ParticleEffect = (particle: Particle, deltaTime: number) => void;
+export type ParticleInitialState = (particle: Particle) => void;
 export type TimeMaskGenerator = (width: number, height: number) => { mask: number[][], timeArray: number[] };
