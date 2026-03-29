@@ -129,6 +129,100 @@ export const createDiagonalMask = (direction: CornerDirection): TimeMaskGenerato
     };
 };
 
+export const centerOutMask: TimeMaskGenerator = (width, height) => {
+    const uniqueTimes = new Set<number>();
+    const mask: number[][] = [];
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
+
+    for (let x = 0; x < width; x++) {
+        const col: number[] = [];
+        for (let y = 0; y < height; y++) {
+            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+            const timeDelay = maxDistance === 0 ? 0 : roundTimeDelay(distance / maxDistance);
+            uniqueTimes.add(timeDelay);
+            col.push(timeDelay);
+        }
+        mask.push(col);
+    }
+    return { mask, timeArray: Array.from(uniqueTimes).sort((a, b) => a - b) };
+}
+
+export const edgesInMask: TimeMaskGenerator = (width, height) => {
+    const uniqueTimes = new Set<number>();
+    const mask: number[][] = [];
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
+
+    for (let x = 0; x < width; x++) {
+        const col: number[] = [];
+        for (let y = 0; y < height; y++) {
+            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+            const timeDelay = maxDistance === 0 ? 0 : roundTimeDelay(1 - (distance / maxDistance));
+            uniqueTimes.add(timeDelay);
+            col.push(timeDelay);
+        }
+        mask.push(col);
+    }
+    return { mask, timeArray: Array.from(uniqueTimes).sort((a, b) => a - b) };
+}
+
+export const splitHorizontalMask: TimeMaskGenerator = (width, height) => {
+    const uniqueTimes = new Set<number>();
+    const mask: number[][] = [];
+    const centerX = width / 2;
+    const maxDistance = centerX;
+
+    for (let x = 0; x < width; x++) {
+        const col: number[] = [];
+        for (let y = 0; y < height; y++) {
+            const distance = Math.abs(x - centerX);
+            const timeDelay = maxDistance === 0 ? 0 : roundTimeDelay(distance / maxDistance);
+            uniqueTimes.add(timeDelay);
+            col.push(timeDelay);
+        }
+        mask.push(col);
+    }
+    return { mask, timeArray: Array.from(uniqueTimes).sort((a, b) => a - b) };
+}
+
+export const splitVerticalMask: TimeMaskGenerator = (width, height) => {
+    const uniqueTimes = new Set<number>();
+    const mask: number[][] = [];
+    const centerY = height / 2;
+    const maxDistance = centerY;
+
+    for (let x = 0; x < width; x++) {
+        const col: number[] = [];
+        for (let y = 0; y < height; y++) {
+            const distance = Math.abs(y - centerY);
+            const timeDelay = maxDistance === 0 ? 0 : roundTimeDelay(distance / maxDistance);
+            uniqueTimes.add(timeDelay);
+            col.push(timeDelay);
+        }
+        mask.push(col);
+    }
+    return { mask, timeArray: Array.from(uniqueTimes).sort((a, b) => a - b) };
+}
+
+export const randomMask: TimeMaskGenerator = (width, height) => {
+    const uniqueTimes = new Set<number>();
+    const mask: number[][] = [];
+
+    for (let x = 0; x < width; x++) {
+        const col: number[] = [];
+        for (let y = 0; y < height; y++) {
+            const timeDelay = roundTimeDelay(Math.random(), 20); // Mniej binów dla widocznego grupowania w losowości
+            uniqueTimes.add(timeDelay);
+            col.push(timeDelay);
+        }
+        mask.push(col);
+    }
+    return { mask, timeArray: Array.from(uniqueTimes).sort((a, b) => a - b) };
+}
+
 export const MasksGenerators = {
     leftToRight: leftToRightMask,
     rightToLeft: rightToLeftMask,
@@ -136,4 +230,9 @@ export const MasksGenerators = {
     bottomToTop: bottomToTopMask,
     sand: sandMask,
     diagonal: createDiagonalMask,
+    centerOut: centerOutMask,
+    edgesIn: edgesInMask,
+    splitHorizontal: splitHorizontalMask,
+    splitVertical: splitVerticalMask,
+    random: randomMask,
 }

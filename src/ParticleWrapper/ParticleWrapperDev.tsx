@@ -11,8 +11,8 @@ import { DevTools } from "./DevTools";
 
 export function ParticleWrapperDev({children}: {children: React.ReactNode}) {
     const [config, setConfig] = useState({
-        fps: 60,
-        maxParticles: 1000,
+        fps: 120,
+        maxParticles: 2000,
     });
     const [timeMaskGenerator, setTimeMaskGenerator] = useState<TimeMaskGenerator>(() => MasksGenerators.diagonal('left-top'));
     const [particleInitialState, setParticleInitialState] = useState<ParticleInitialState>(() => ParticleInitialStates.explosion);

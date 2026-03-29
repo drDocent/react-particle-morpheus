@@ -246,6 +246,11 @@ export function DevTools({ config, reset, start, stop, hardReset, timeMaskGenera
                                 <option value="topToBottom">Top To Bottom</option>
                                 <option value="bottomToTop">Bottom To Top</option>
                                 <option value="sand">Sand</option>
+                                <option value="centerOut">Center Out</option>
+                                <option value="edgesIn">Edges In</option>
+                                <option value="splitHorizontal">Split Horizontal</option>
+                                <option value="splitVertical">Split Vertical</option>
+                                <option value="random">Random</option>
                                 <option value="diagonal-left-top">Diagonal (Left-Top)</option>
                                 <option value="diagonal-right-top">Diagonal (Right-Top)</option>
                                 <option value="diagonal-left-bottom">Diagonal (Left-Bottom)</option>

@@ -74,34 +74,15 @@ export function App() {
 
       {/* Kolumna 1 */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-          <button onClick={() => particleWrapperRef.current?.reset()} style={{ width: '100px', height: '50px' }}>
-            Resetuj
-          </button>
-          <button onClick={() => particleWrapperRef.current?.start()} style={{ width: '100px', height: '50px' }}>
-            Start
-          </button>
-          <button onClick={() => particleWrapperRef.current?.stop()} style={{ width: '100px', height: '50px' }}>
-            Stop
-          </button>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button onClick={() => setMaskKey('left-top')} style={{ padding: '10px' }}>Left-Top</button>
-          <button onClick={() => setMaskKey('right-top')} style={{ padding: '10px' }}>Right-Top</button>
-          <button onClick={() => setMaskKey('left-bottom')} style={{ padding: '10px' }}>Left-Bottom</button>
-          <button onClick={() => setMaskKey('right-bottom')} style={{ padding: '10px' }}>Right-Bottom</button>
-        </div>
-
-        <ParticleWrapper
-          config={{
-            fps: 120,
-            maxParticles: 3000,
-          }}
-          particleInitialState={particleInitialState}
-          particleEffect={applyParticleEffect}
-          timeMaskGenerator={masks[maskKey]}
-          ref={particleWrapperRef}
+        <ParticleWrapperDev
+          // config={{
+          //   fps: 120,
+          //   maxParticles: 3000,
+          // }}
+          // particleInitialState={particleInitialState}
+          // particleEffect={applyParticleEffect}
+          // timeMaskGenerator={masks[maskKey]}
+          // ref={particleWrapperRef}
         >
           <div
             style={{
@@ -234,7 +215,7 @@ export function App() {
               {inputValue ? 'Wyślij wiadomość' : 'Obserwuj'}
             </button>
           </div>
-        </ParticleWrapper>
+        </ParticleWrapperDev>
       </div>
 
       {/* Kolumna 2 */}

@@ -17,8 +17,8 @@ interface ParticleWrapperProps {
     onReset?: () => void;
 
     timeMaskGenerator?: (width: number, height: number) => {mask: number[][], timeArray: number[]}; // opcjonalna funkcja do generowania niestandardowych czasów dla timerMask, jeśli chcesz mieć większą kontrolę nad tym, kiedy poszczególne cząsteczki mają się pojawiać
-    particleInitialState: (particle: Particle) => Particle;
-    particleEffect: (particle: Particle, deltaTime: number) => Particle;
+    particleInitialState: (particle: Particle) => void;
+    particleEffect: (particle: Particle, deltaTime: number) => void;
 }
 
 export interface ParticleWrapperRef {
@@ -160,7 +160,8 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
                         particleLife,
                     };
 
-                    newParticlesList.push(particleInitialState(particle));
+                    particleInitialState(particle);
+                    newParticlesList.push(particle);
                     rowIndex++;
                 }
                 colIndex++;
@@ -315,10 +316,7 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
                 allDead = false;
 
                 if (elapsedTime >= p.particleLife.spawnTime) {
-                    const updated = particleEffect(p, Math.min(delta / 1000, 0.1));
-                    if (updated !== null) {
-                        particles.current[i] = updated;
-                    }
+                    particleEffect(p, Math.min(delta / 1000, 0.1));
                 }
             }
 
@@ -389,7 +387,7 @@ export const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperPro
             p.particleLife.isDead = false;
             p.particleLife.age = 0;
             p.particleStyle.opacity = 1;
-            particles.current[i] = particleInitialState(p);
+            particleInitialState(p);
         }
     }
 
