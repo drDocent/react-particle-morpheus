@@ -146,6 +146,7 @@ export function App() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <ParticleWrapperDev>
           <button
+            className="moving-button"
             style={{
               padding: '10px 20px',
               backgroundColor: '#41B0FF',

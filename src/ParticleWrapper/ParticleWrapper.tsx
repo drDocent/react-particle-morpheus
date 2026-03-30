@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback, isValidElement, cloneElement } from "react";
 import { toCanvas } from "html-to-image";
 import type { Particle } from "./types";
 import { MasksGenerators } from "./maskGenerators";
@@ -49,9 +49,8 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
     const [isRunning, setIsRunning] = useState(false);
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const childrenRef = useRef<HTMLDivElement>(null);
+    const childrenRef = useRef<HTMLElement | null>(null);
     const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
-    const timerMaskRef = useRef<number[][]>([]);
     const elementMaskRef = useRef<string[]>([]);
     const timeArrayRef = useRef<number[]>([]);
     const workerRef = useRef<Worker | null>(null);
@@ -76,6 +75,21 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
     const resolvedParticleInitialState = ParticleInitialStates[particleInitialState];
     const resolvedParticleEffect = ParticleEffects[particleEffect];
 
+    const clearMaskStyles = useCallback((element: HTMLElement) => {
+        element.style.maskImage = "none";
+        element.style.setProperty('-webkit-mask-image', 'none');
+    }, []);
+
+    const applyMaskStyles = useCallback((element: HTMLElement, maskDataUrl: string) => {
+        element.style.maskImage = `url(${maskDataUrl})`;
+        element.style.maskSize = "100% 100%";
+        element.style.maskRepeat = "no-repeat";
+        element.style.imageRendering = "pixelated";
+        element.style.setProperty('-webkit-mask-image', `url(${maskDataUrl})`);
+        element.style.setProperty('-webkit-mask-size', '100% 100%');
+        element.style.setProperty('-webkit-mask-repeat', 'no-repeat');
+    }, []);
+
     const blobToDataUrl = useCallback((blob: Blob) => {
         return new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -86,7 +100,7 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
     }, []);
 
     // Renderuje children do offscreen canvas za pomocą html-to-image i tworzy listę cząsteczek
-    const setupComponent = useCallback(async (element: HTMLDivElement) => {
+    const setupComponent = useCallback(async (element: HTMLElement) => {
         const rect = element.getBoundingClientRect();
         const setupSequence = setupSequenceRef.current + 1;
         setupSequenceRef.current = setupSequence;
@@ -167,7 +181,6 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
                 return;
             }
 
-            timerMaskRef.current = workerData.timeMask;
             timeArrayRef.current = workerData.timeArray;
             particles.current = workerData.particles;
 
@@ -270,21 +283,7 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
                     // lastMaskIndexRef.current - 2 oznacza przeskoczenie "na poprzednią potencjalną maskę"
                     const maskDataUrl = elementMaskRef.current[lastMaskIndexRef.current - 2];
 
-                    if (maskDataUrl) {
-                        // Zastosuj styl maski na właściwym elemencie (dzieciach)
-                        const targetEl = childrenRef.current;
-                        
-                        // Standaryzowane propercje
-                        targetEl.style.maskImage = `url(${maskDataUrl})`;
-                        targetEl.style.maskSize = "100% 100%";
-                        targetEl.style.maskRepeat = "no-repeat";
-                        targetEl.style.imageRendering = "pixelated";
-                        
-                        // Rozszerzenia WebKit, niezbędne w niektórych przeglądarkach (Safari, Opera, część Chrome)
-                        targetEl.style.setProperty('-webkit-mask-image', `url(${maskDataUrl})`);
-                        targetEl.style.setProperty('-webkit-mask-size', '100% 100%');
-                        targetEl.style.setProperty('-webkit-mask-repeat', 'no-repeat');
-                    }
+                    if (maskDataUrl) applyMaskStyles(childrenRef.current, maskDataUrl);
                 }
                 if (!shatterFinishedCalledRef.current && lastMaskIndexRef.current > timeArrayRef.current.length) {
                     onShatterFinished();
@@ -295,6 +294,7 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
             const delta = currentTime - lastTime;
             if (delta < interval) return;
             lastTime = currentTime;
+            const deltaSeconds = Math.min(delta / 1000, 0.1);
 
             let allDead = true;
 
@@ -306,7 +306,7 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
                 allDead = false;
 
                 if (elapsedTime >= p.particleLife.spawnTime) {
-                    resolvedParticleEffect(p, Math.min(delta / 1000, 0.1));
+                    resolvedParticleEffect(p, deltaSeconds);
                 }
             }
 
@@ -333,8 +333,7 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
         
         // Zdejmujemy maskę przed wykonaniem zrzutu html-to-image, 
         // aby nie zapisać w pamięci przycisku, który już zniknął (to powodowało puste, przezroczyste cząsteczki)
-        childrenRef.current.style.maskImage = "none";
-        childrenRef.current.style.setProperty('-webkit-mask-image', 'none');
+        clearMaskStyles(childrenRef.current);
         
         // Przy ponownym generowaniu cząsteczek bezpiecznie resetujemy również czasy
         elapsedTimeRef.current = 0;
@@ -342,7 +341,7 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
         shatterFinishedCalledRef.current = false;
         
         setupComponent(childrenRef.current);
-    }, [setupComponent, windowSize]);
+    }, [setupComponent, windowSize, clearMaskStyles]);
 
     useEffect(() => {
         function handleResize() {
@@ -385,8 +384,7 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
         reset: () => {
             setIsRunning(false);
             if (childrenRef.current) {
-                childrenRef.current.style.maskImage = "none";
-                childrenRef.current.style.setProperty('-webkit-mask-image', 'none');
+                clearMaskStyles(childrenRef.current);
             }
             resetParticles();
             onReset();
@@ -394,8 +392,7 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
         hardReset: () => {
             setIsRunning(false);
             if (childrenRef.current) {
-                childrenRef.current.style.maskImage = "none";
-                childrenRef.current.style.setProperty('-webkit-mask-image', 'none');
+                clearMaskStyles(childrenRef.current);
                 const element = childrenRef.current;
                 setupComponent(element);
             }
@@ -408,13 +405,21 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
         stop: () => {
             setIsRunning(false);
         },
-    }));
+    }), [onReset, onStart, clearMaskStyles, setupComponent, resolvedParticleInitialState]);
+
+    const handleChildrenRef = useCallback((node: HTMLElement | null) => {
+        childrenRef.current = node;
+    }, []);
+
+    const renderedChildren = isValidElement(children)
+        ? cloneElement(children as React.ReactElement<any>, {
+            ref: handleChildrenRef,
+        })
+        : <div ref={handleChildrenRef}>{children}</div>;
 
     return (
         <div>
-            <div ref={childrenRef}>
-                {children}
-            </div>
+            {renderedChildren}
             <canvas
                 width={windowSize.width}
                 height={windowSize.height}

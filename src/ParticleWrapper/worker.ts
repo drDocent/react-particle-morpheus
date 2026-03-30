@@ -1,4 +1,3 @@
-import { ParticleInitialStates } from "./particleInitialStates";
 import { MasksGenerators } from "./maskGenerators";
 // co przyjmuje:
 // - szerokość i wysokość obszaru
@@ -7,7 +6,7 @@ import { MasksGenerators } from "./maskGenerators";
 // - maxParticles
 // - rectX, rectY
 
-import type { TimeMaskGenerator, ParticleInitialState, Particle, ParticlePhysics, ParticleStyle, ParticleLife } from "../ParticleWrapper/types";
+import type { TimeMaskGenerator, Particle, ParticlePhysics, ParticleStyle, ParticleLife } from "../ParticleWrapper/types";
 // co zwraca:
 // - maskę czasów
 // - tablicę mask dla obiektu children
@@ -15,10 +14,9 @@ import type { TimeMaskGenerator, ParticleInitialState, Particle, ParticlePhysics
 // - tablicę cząsteczek
 
 self.onmessage = async function (e) {
-    const { requestId, width, height, rectX, rectY, maxParticles, maskGeneratorName, particleInitialStateName }: { requestId: number, width: number, height: number, rectX: number, rectY: number, maxParticles: number, maskGeneratorName: keyof typeof MasksGenerators, particleInitialStateName: keyof typeof ParticleInitialStates } = e.data;
+    const { requestId, width, height, rectX, rectY, maxParticles, maskGeneratorName }: { requestId: number, width: number, height: number, rectX: number, rectY: number, maxParticles: number, maskGeneratorName: keyof typeof MasksGenerators } = e.data;
 
     const timeMaskGenerator: TimeMaskGenerator = MasksGenerators[maskGeneratorName];
-    const particleInitialState: ParticleInitialState = ParticleInitialStates[particleInitialStateName];
 
     const pixelWidth = Math.ceil(Math.sqrt((width * height) / maxParticles));
     const pixelHeight = Math.ceil((width * height) / maxParticles / pixelWidth);
@@ -78,7 +76,6 @@ self.onmessage = async function (e) {
                 particleLife,
             };
 
-            particleInitialState(particle);
             newParticlesList.push(particle);
             rowIndex++;
         }

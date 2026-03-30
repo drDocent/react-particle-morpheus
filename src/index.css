@@ -7,3 +7,17 @@ body, html {
   margin: 0;
   /* overflow: hidden; <- użyj tego, jeśli aplikacja ma zawsze dokładnie rozmiar 1 ekranu (100vh) */
 }
+
+@keyframes moveLeftRight {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(300px);
+  }
+}
+
+.moving-button {
+  display: inline-block;
+  animation: moveLeftRight 2.2s ease-in-out infinite alternate;
+}
