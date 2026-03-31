@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback, isValidElement, cloneElement } from "react";
 import { toCanvas } from "html-to-image";
-import type { Particle } from "./types";
+import type { Particle, ParticleWrapperConfig } from "./types";
 import { MasksGenerators } from "./maskGenerators";
 import { ParticleInitialStates } from "./particleInitialStates";
 import { ParticleEffects } from "./particleEffects";
@@ -8,11 +8,7 @@ import { ParticleEffects } from "./particleEffects";
 interface ParticleWrapperProps {
     children: React.ReactNode;
 
-    config?: {
-        maxParticles?: number;
-        fps?: number;
-        rounded?: boolean;
-    };
+    config?: Partial<ParticleWrapperConfig>;
 
     onStart?: () => void;
     onShatterFinished?: () => void; // wywoływane, gdy orginalny komponent będzie w pełni rozbity na cząsteczki
@@ -69,7 +65,6 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
     const config = {
         maxParticles: userConfig?.maxParticles ?? 2000,
         fps: userConfig?.fps ?? 120,
-        rounded: userConfig?.rounded ?? false,
     };
 
     const resolvedParticleInitialState = ParticleInitialStates[particleInitialState];

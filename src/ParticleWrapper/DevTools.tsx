@@ -5,11 +5,10 @@ import { MasksGenerators } from "./maskGenerators";
 import { ParticleInitialStates } from "./particleInitialStates";
 import { ParticleEffects } from "./particleEffects";
 
+import type { ParticleWrapperConfig } from "./types";
+
 interface DevToolsProps {
-    config: {
-        fps: number;
-        maxParticles: number;
-    }
+    config: ParticleWrapperConfig;
     reset: () => void;
     start: () => void;
     stop: () => void;
@@ -19,10 +18,7 @@ interface DevToolsProps {
     particleInitialState: keyof typeof ParticleInitialStates;
     particleEffect: keyof typeof ParticleEffects;
 
-    setConfig: React.Dispatch<React.SetStateAction<{
-        fps: number;
-        maxParticles: number;
-    }>>;
+    setConfig: React.Dispatch<React.SetStateAction<ParticleWrapperConfig>>;
     setTimeMaskGenerator: React.Dispatch<React.SetStateAction<keyof typeof MasksGenerators>>;
     setParticleInitialState: React.Dispatch<React.SetStateAction<keyof typeof ParticleInitialStates>>;
     setParticleEffect: React.Dispatch<React.SetStateAction<keyof typeof ParticleEffects>>;

@@ -1,3 +1,8 @@
+export interface ParticleWrapperConfig {
+    maxParticles: number; // Maksymalna liczba cząsteczek, które mogą istnieć jednocześnie
+    fps: number; // Docelowa liczba klatek na sekundę dla animacji cząsteczek
+}
+
 export interface ParticlePhysics {
     velocityX: number;
     velocityY: number;
