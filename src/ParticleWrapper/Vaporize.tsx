@@ -401,11 +401,11 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             let allDead = true; // flaga do sprawdzenia, czy wszystkie cząsteczki są martwe
 
-            if(!childrenRef.current) return;
-            const { x: rectX, y: rectY } = childrenRef.current.getBoundingClientRect(); 
+            if (!childrenRef.current) return;
+            const { x: rectX, y: rectY } = childrenRef.current.getBoundingClientRect();
 
             particlesRef.current.forEach(particle => {
-                if(!particle.particleLife.hasSpawned){
+                if (!particle.particleLife.hasSpawned) {
                     particle.originX = rectX + particle.particleStyle.sprite.sourceX;
                     particle.originY = rectY + particle.particleStyle.sprite.sourceY;
                     particle.x = particle.originX;
@@ -435,7 +435,7 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
                 animationFrameId = requestAnimationFrame(frame);
             }
         }
-        
+
         animationFrameId = requestAnimationFrame(frame);
 
         return () => {
@@ -490,21 +490,28 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         onReset();
     }, [clearMaskStyles, resolvedParticleInitialState, onReset]);
 
-    const refreshSnapshot = useCallback(() => {
+    const refreshSnapshot = useCallback(async () => {
+        if (!childrenRef.current) return false;
+
+        setSetupState(prev => ({ ...prev, snapshot: "loading" }));
+
         isRunningRef.current = false;
         setIsRunning(false);
-        // Resetujemy stan konfiguracji, co ponownie wymusi wykonanie efektu "setup" 
-        // (pobranie nowego snapshotu i uruchomienie workera i reset czasu)
-        elapsedTimeRef.current = 0;
-        lastMaskIndexRef.current = 0;
-        shatterFinishedCalledRef.current = false;
-        setSetupState({
-            snapshot: "loading",
-            particles: "loading",
-            childrenMasks: "loading",
-            timeArray: "loading",
+
+        clearMaskStyles(childrenRef.current);
+
+        const element = childrenRef.current;
+        const snapshot = await toCanvas(element, {
+            width: element.offsetWidth,
+            height: element.offsetHeight,
+            pixelRatio: 1,
         });
-    }, []);
+
+        setSetupState(prev => ({ ...prev, snapshot: "ready" }));
+
+        snapshotRef.current = snapshot;
+        return true;
+    }, [clearMaskStyles]);
 
     const rebuild = useCallback(() => {
         // rebuild() może działać identycznie jak refreshSnapshot w naszej implementacji,
@@ -552,13 +559,13 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
             <canvas
                 width={windowSizeRef.current.width}
                 height={windowSizeRef.current.height}
-                style={{ 
-                    position: "fixed", 
-                    top: 0, 
-                    left: 0, 
-                    pointerEvents: "none", 
-                    width: '100vw', 
-                    height: '100vh' 
+                style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    pointerEvents: "none",
+                    width: '100vw',
+                    height: '100vh'
                 }}
                 ref={canvasRef}
             />
