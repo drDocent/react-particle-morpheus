@@ -1,4 +1,4 @@
-export interface ParticleWrapperConfig {
+export interface VaporizeConfig {
     maxParticles: number; // Maksymalna liczba cząsteczek, które mogą istnieć jednocześnie
     fps: number; // Docelowa liczba klatek na sekundę dla animacji cząsteczek
 }
@@ -25,6 +25,7 @@ export interface ParticleLife {
     age: number; // czas życia cząsteczki
     lifetime: number; // maksymalny czas życia cząsteczki
     isDead: boolean; // czy cząsteczka jest martwa
+    hasSpawned: boolean; // czy cząsteczka została już stworzona (spawnTime minął)
 }
 
 export interface Particle {

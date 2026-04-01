@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ParticleWrapperDev } from './ParticleWrapper'
+import { VaporizeDev } from './ParticleWrapper'
 import { Trash } from 'lucide-react'
 
 export function App() {
@@ -11,7 +11,7 @@ export function App() {
 
       {/* Kolumna 1 */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <ParticleWrapperDev>
+        <VaporizeDev>
           <div
             style={{
               position: 'relative',
@@ -139,12 +139,12 @@ export function App() {
               {inputValue ? 'Wyślij wiadomość' : 'Obserwuj'}
             </button>
           </div>
-        </ParticleWrapperDev>
+        </VaporizeDev>
       </div>
 
       {/* Kolumna 2 */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <ParticleWrapperDev>
+        <VaporizeDev>
           <button
             className="moving-button"
             style={{
@@ -160,7 +160,7 @@ export function App() {
           >
             Kliknij mnie!
           </button>
-        </ParticleWrapperDev>
+        </VaporizeDev>
       </div>
 
     </div>

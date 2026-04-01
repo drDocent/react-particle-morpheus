@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, cloneElement, isValidElement, forwardRef, useImperativeHandle, useMemo } from "react";
-import type { ParticleWrapperConfig } from "./types";
+import type { VaporizeConfig } from "./types";
 import { MasksGenerators } from "./maskGenerators";
 import { ParticleInitialStates } from "./particleInitialStates";
 import { ParticleEffects } from "./particleEffects";
@@ -9,10 +9,10 @@ import ParticleWorker from "./worker?worker&inline";
 import type { WorkerRequest, WorkerSuccessResponse } from "./worker";
 import type { Particle } from "./types";
 
-interface ParticleWrapperProps {
+interface VaporizeProps {
     children: React.ReactNode;
 
-    config?: Partial<ParticleWrapperConfig>;
+    config?: Partial<VaporizeConfig>;
 
     onStart?: () => void;
     onShatterFinished?: () => void; // wywoływane, gdy orginalny komponent będzie w pełni rozbity na cząsteczki
@@ -24,7 +24,7 @@ interface ParticleWrapperProps {
     particleEffect: keyof typeof ParticleEffects; // klucz efektu cząsteczek z obiektu ParticleEffects
 }
 
-export interface ParticleWrapperRef {
+export interface VaporizeRef {
     start: () => void; // metoda do uruchomienia/wznowienia animacji cząsteczek
     stop: () => void; // metoda do zatrzymania animacji cząsteczek (pauza)
     reset: () => void; // metoda do zresetowania animacji cząsteczek (wraca do stanu początkowego)
@@ -43,7 +43,7 @@ type SetupState = {
     timeArray: SetupStatus;
 }
 
-const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
+const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
     children,
     config: userConfig,
     onStart = () => { },
@@ -94,7 +94,7 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
 
     // Zmienne przeliczane
     const isReady = Object.values(setupState).every(status => status === "ready");
-    const config = useMemo<ParticleWrapperConfig>(() => ({
+    const config = useMemo<VaporizeConfig>(() => ({
         maxParticles: 1000,
         fps: 60,
         ...userConfig,
@@ -542,4 +542,4 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
     );
 });
 
-export { ParticleWrapper };
+export { Vaporize };

@@ -5,10 +5,10 @@ import { MasksGenerators } from "./maskGenerators";
 import { ParticleInitialStates } from "./particleInitialStates";
 import { ParticleEffects } from "./particleEffects";
 
-import type { ParticleWrapperConfig } from "./types";
+import type { VaporizeConfig } from "./types";
 
 interface DevToolsProps {
-    config: ParticleWrapperConfig;
+    config: VaporizeConfig;
     reset: () => void;
     start: () => void;
     stop: () => void;
@@ -17,7 +17,7 @@ interface DevToolsProps {
     particleInitialState: keyof typeof ParticleInitialStates;
     particleEffect: keyof typeof ParticleEffects;
 
-    setConfig: React.Dispatch<React.SetStateAction<ParticleWrapperConfig>>;
+    setConfig: React.Dispatch<React.SetStateAction<VaporizeConfig>>;
     setTimeMaskGenerator: React.Dispatch<React.SetStateAction<keyof typeof MasksGenerators>>;
     setParticleInitialState: React.Dispatch<React.SetStateAction<keyof typeof ParticleInitialStates>>;
     setParticleEffect: React.Dispatch<React.SetStateAction<keyof typeof ParticleEffects>>;
