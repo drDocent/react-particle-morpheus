@@ -30,6 +30,7 @@ export interface VaporizeRef {
     reset: () => void; // metoda do zresetowania animacji cząsteczek (wraca do stanu początkowego)
     refreshSnapshot: () => void; // metoda do odświeżenia snapshotu children (przydatne, gdy children się zmienia, ALE NIE ZMIENIA SIĘ JEGO ROZMIAR)
     rebuild: () => void; // metoda do całkowitego przebudowania cząsteczek (przydatne, gdy children się zmienia i zmienia swój rozmiar)
+    saveSnapshot: (fileName?: string) => Promise<boolean>; // zapisuje aktualny snapshot html-to-image do pliku PNG
 
     isReady: () => boolean; // metoda do sprawdzenia, czy cząsteczki są gotowe do startu (np. czy worker zakończył generowanie cząsteczek)
     isRunning: () => boolean; // metoda do sprawdzenia, czy animacja cząsteczek jest aktualnie uruchomiona
@@ -511,6 +512,28 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         refreshSnapshot();
     }, [refreshSnapshot]);
 
+    const saveSnapshot = useCallback(async (fileName = "vaporize-snapshot.png") => {
+        const snapshot = snapshotRef.current;
+        if (!snapshot) return false;
+
+        const blob = await new Promise<Blob | null>((resolve) => {
+            snapshot.toBlob(resolve, "image/png");
+        });
+
+        if (!blob) return false;
+
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = fileName.endsWith(".png") ? fileName : `${fileName}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+
+        return true;
+    }, []);
+
 
     useImperativeHandle(ref, () => ({
         start,
@@ -518,9 +541,10 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         reset,
         refreshSnapshot,
         rebuild,
+        saveSnapshot,
         isReady: () => Object.values(setupState).every(status => status === "ready"),
         isRunning: () => isRunning,
-    }), [start, stop, reset, refreshSnapshot, rebuild, isRunning, setupState]);
+    }), [start, stop, reset, refreshSnapshot, rebuild, saveSnapshot, isRunning, setupState]);
 
     return (
         <div>

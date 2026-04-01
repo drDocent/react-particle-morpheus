@@ -12,6 +12,8 @@ interface DevToolsProps {
     reset: () => void;
     start: () => void;
     stop: () => void;
+    refreshSnapshot: () => void;
+    saveSnapshot: () => void;
 
     timeMaskGenerator: keyof typeof MasksGenerators;
     particleInitialState: keyof typeof ParticleInitialStates;
@@ -23,7 +25,7 @@ interface DevToolsProps {
     setParticleEffect: React.Dispatch<React.SetStateAction<keyof typeof ParticleEffects>>;
 }
 
-export function DevTools({ config, reset, start, stop, timeMaskGenerator, particleInitialState, particleEffect, setConfig, setTimeMaskGenerator, setParticleInitialState, setParticleEffect }: DevToolsProps) {
+export function DevTools({ config, reset, start, stop, refreshSnapshot, saveSnapshot, timeMaskGenerator, particleInitialState, particleEffect, setConfig, setTimeMaskGenerator, setParticleInitialState, setParticleEffect }: DevToolsProps) {
 
     const [devToolsPosition, setDevToolsPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -180,6 +182,12 @@ export function DevTools({ config, reset, start, stop, timeMaskGenerator, partic
                         </button>
                         <button onClick={stop} className="dev-btn" style={{ backgroundColor: 'rgb(164, 164, 164)' }}> 
                             Stop
+                        </button>
+                        <button onClick={refreshSnapshot} className="dev-btn" style={{ backgroundColor: 'rgb(69, 101, 144)' }}> 
+                            Snapshot
+                        </button>
+                        <button onClick={saveSnapshot} className="dev-btn" style={{ backgroundColor: 'rgb(120, 85, 170)' }}>
+                            Save PNG
                         </button>
                     </div>
                     <div style={{paddingLeft: 10, paddingRight: 10, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 220}}>

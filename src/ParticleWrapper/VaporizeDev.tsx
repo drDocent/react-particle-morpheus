@@ -60,6 +60,10 @@ export function VaporizeDev({
                 reset={() => VaporizeRef.current?.reset()}
                 start={() => VaporizeRef.current?.start()}
                 stop={() => VaporizeRef.current?.stop()}
+                refreshSnapshot={()=> VaporizeRef.current?.refreshSnapshot()}
+                saveSnapshot={() => {
+                    void VaporizeRef.current?.saveSnapshot();
+                }}
 
                 timeMaskGenerator={timeMaskGenerator}
                 particleInitialState={particleInitialState}
