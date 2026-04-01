@@ -7,16 +7,38 @@ import { MasksGenerators } from "./maskGenerators";
 // - rectX, rectY
 
 import type { TimeMaskGenerator, Particle, ParticlePhysics, ParticleStyle, ParticleLife } from "../ParticleWrapper/types";
+import { ParticleInitialStates } from "./particleInitialStates";
 // co zwraca:
 // - maskę czasów
 // - tablicę mask dla obiektu children
 // - tablicę czasów dla poszczególnych cząsteczek
 // - tablicę cząsteczek
 
+export interface WorkerRequest {
+    requestId: number;
+    width: number;
+    height: number;
+    rectX: number;
+    rectY: number;
+    maxParticles: number;
+    maskGeneratorName: keyof typeof MasksGenerators;
+    particleInitialStateName: keyof typeof ParticleInitialStates; // opcjonalnie, jeśli chcemy, żeby worker od razu ustawił początkowy stan cząsteczek
+}
+
+export interface WorkerResponse {
+    type: 'SUCCESS';
+    requestId: number;
+    timeArray: number[];
+    maskBlobs: Blob[];
+    particles: Particle[];
+    errorMessage?: string;
+}
+
 self.onmessage = async function (e) {
-    const { requestId, width, height, rectX, rectY, maxParticles, maskGeneratorName }: { requestId: number, width: number, height: number, rectX: number, rectY: number, maxParticles: number, maskGeneratorName: keyof typeof MasksGenerators } = e.data;
+    const { requestId, width, height, rectX, rectY, maxParticles, maskGeneratorName, particleInitialStateName }: WorkerRequest = e.data;
 
     const timeMaskGenerator: TimeMaskGenerator = MasksGenerators[maskGeneratorName];
+    const particleInitialState = ParticleInitialStates[particleInitialStateName];
 
     const pixelWidth = Math.ceil(Math.sqrt((width * height) / maxParticles));
     const pixelHeight = Math.ceil((width * height) / maxParticles / pixelWidth);
@@ -75,7 +97,7 @@ self.onmessage = async function (e) {
                 particleStyle,
                 particleLife,
             };
-
+            particleInitialState(particle);
             newParticlesList.push(particle);
             rowIndex++;
         }
@@ -113,5 +135,5 @@ self.onmessage = async function (e) {
         timeArray: sortedTimeArray, 
         maskBlobs, 
         particles: newParticlesList 
-    });
+    } as WorkerResponse);
 }

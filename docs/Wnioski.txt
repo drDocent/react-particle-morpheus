@@ -1,0 +1,65 @@
+1. Przy inizjalizacji powininem mieć w dupie originX i originY
+    bo i tak jak element jest w ruchu to powinienem to przeliczyć
+    na bierząco przy wchodzeniu particla do życia
+2. Setup powinien robić screenshota raz chyba ze zmieni się children
+    i zainicjalizować particle też raz
+
+Dobra tak powinno działać nowe flow:
+
+wszystkie propsy:
+
+- children: React.ReactNode;
+
+- config?: Partial<ParticleWrapperConfig>;
+
+- onStart?: () => void;
+- onShatterFinished?: () => void; // wywoływane, gdy orginalny komponent będzie w pełni rozbity na cząsteczki
+- onEnd?: () => void;
+- onReset?: () => void;
+
+- timeMaskGenerator: keyof typeof MasksGenerators; // klucz generatora maski z obiektu MasksGenerators
+- particleInitialState: keyof typeof ParticleInitialStates; // klucz stanu początkowego z obiektu ParticleInitialStates
+- particleEffect: keyof typeof ParticleEffects;
+
+jak się zmienia Children to trzeba przeliczyć wszystko
+jak się zmienia config:
+przy zmianie fps nie powinno się nic przeliczać tylko w useEffect się rzadziej particle updatują
+przy zmianie maxParticles powinno się wszystko przeliczyć na nowo, bo maski mają nowe wymiary potencjalnie, tablica particli jest nie aktualna itd.
+
+Jak sie zmieniają funkcje to nic się nie powinno przelicza
+jak sie zmienia timeMaskGenerator to powinny się przleiczyć na nowo 
+- maska czasu,
+- maski faktyczne elementu,
+- wszystkie particle z nowym czasem itd.
+
+Jak się zmienia particalInitialState to powinno się przeliczyć na nowo:
+- lista particli z początkowymi wartościami fizycznimi innymi
+
+Jak się zmienia particleEffect to powinno się przeliczyć na nowo nic tylko nowy efekt się załączyć do animacji
+
+Jak się zmienia timeMaskGenerator, ParticleInitialState, particleEffect to komponent powinien się zresetować w sensie
+- maska powinna być z powrotem ustawiona na 0
+- particlePowinny być schowane w initialState
+- isRunning powinno się ustawić na false
+
+
+co się powinno dziać jak mamy stany w środku różne
+
+powinien istnieć stan isReady czyli stan który określa czy wszystkie potrzebne rzeczy
+do rozpoczęcia animacji są gotowe czyli:
+- maska czasu
+- lista masek
+- lista cząsteczek z początkowym stanem
+- obrazek z children
+
+jak powinno działać isRunning:
+- jeżeli true to wszystkie klatki się przeliczają itd.
+- jeżeli false to wszystko stoi w miejscu ale wszystko widać
+- jeżeli wznowimy z false na true to powinno lecieć dalej
+
+Przy resize okna powinien się zresizować canvas ale zakładamy na ten moment że element
+children jest statyczny względem rozmiarów
+
+Powinna istnieć funckcja resetChildrenCanvas, która wygeneruje na nowo obrazek children
+
+funckja start() powinna jedynie wykonywać 

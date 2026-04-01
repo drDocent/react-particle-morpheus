@@ -1,9 +1,12 @@
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback, isValidElement, cloneElement } from "react";
-import { toCanvas } from "html-to-image";
-import type { Particle, ParticleWrapperConfig } from "./types";
+import { useState, useEffect, useRef, useCallback, cloneElement, isValidElement, forwardRef, useImperativeHandle } from "react";
+import type { ParticleWrapperConfig } from "./types";
 import { MasksGenerators } from "./maskGenerators";
 import { ParticleInitialStates } from "./particleInitialStates";
 import { ParticleEffects } from "./particleEffects";
+
+import { toCanvas } from "html-to-image";
+import type { WorkerRequest, WorkerResponse } from "./worker";
+import type { Particle } from "./types";
 
 interface ParticleWrapperProps {
     children: React.ReactNode;
@@ -21,10 +24,22 @@ interface ParticleWrapperProps {
 }
 
 export interface ParticleWrapperRef {
-    reset: () => void;
-    hardReset: () => void; // reset z ponownym renderowaniem offscreen canvas, przydatny gdy dzieci się zmieniają
-    start: () => void;
-    stop: () => void;
+    start: () => void; // metoda do uruchomienia/wznowienia animacji cząsteczek
+    stop: () => void; // metoda do zatrzymania animacji cząsteczek (pauza)
+    reset: () => void; // metoda do zresetowania animacji cząsteczek (wraca do stanu początkowego)
+    refreshSnapshot: () => void; // metoda do odświeżenia snapshotu children (przydatne, gdy children się zmienia, ALE NIE ZMIENIA SIĘ JEGO ROZMIAR)
+    rebuild: () => void; // metoda do całkowitego przebudowania cząsteczek (przydatne, gdy children się zmienia i zmienia swój rozmiar)
+
+    isReady: () => boolean; // metoda do sprawdzenia, czy cząsteczki są gotowe do startu (np. czy worker zakończył generowanie cząsteczek)
+    isRunning: () => boolean; // metoda do sprawdzenia, czy animacja cząsteczek jest aktualnie uruchomiona
+}
+
+type SetupStatus = "loading" | "ready" | "error";
+type SetupState = {
+    snapshot: SetupStatus;
+    particles: SetupStatus;
+    childrenMasks: SetupStatus;
+    timeArray: SetupStatus;
 }
 
 const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
@@ -38,38 +53,63 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
     particleInitialState,
     particleEffect,
 }, ref) => {
+    // Stany
+    const [childrenElement, setChildrenElement] = useState<HTMLElement | null>(null);
+    const [isRunning, setIsRunning] = useState(false);
+    const [setupState, setSetupState] = useState<SetupState>({
+        snapshot: "loading",
+        particles: "loading",
+        childrenMasks: "loading",
+        timeArray: "loading",
+    });
     const [windowSize, setWindowSize] = useState({
         width: window.innerWidth,
         height: window.innerHeight,
     });
-    const [isRunning, setIsRunning] = useState(false);
 
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const childrenRef = useRef<HTMLElement | null>(null);
-    const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
-    const elementMaskRef = useRef<string[]>([]);
-    const timeArrayRef = useRef<number[]>([]);
-    const workerRef = useRef<Worker | null>(null);
-    const workerRequestIdRef = useRef<number>(0);
-    const maskObjectUrlsRef = useRef<string[]>([]);
-    const setupSequenceRef = useRef<number>(0);
 
-    const particles = useRef<Particle[]>([]);
-    const animationFrameRef = useRef<number>(0);
-    
-    // Zmienne do śledzenia stanu postępu animacji i maski po zatrzymaniu (stop/start)
-    const elapsedTimeRef = useRef<number>(0);
-    const lastMaskIndexRef = useRef<number>(0);
-    const shatterFinishedCalledRef = useRef<boolean>(false);
+    //Refy
+    const particlesRef = useRef<Particle[]>([]); //referencja do aktualnej listy cząsteczek, która jest renderowana na canvasie, przydatna do modyfikowania właściwości cząsteczek w czasie rzeczywistym (np. przy zmianie efektu cząsteczek)
 
-    const config = {
-        maxParticles: userConfig?.maxParticles ?? 2000,
-        fps: userConfig?.fps ?? 120,
+    const childrenRef = useRef<HTMLElement | null>(null); //referencja do children ( tych sklonowanych )
+    const snapshotRef = useRef<HTMLCanvasElement | null>(null); //referencja do snapshotu children, przydatna do generowania masek dla poszczególnych części children
+    const canvasRef = useRef<HTMLCanvasElement>(null); //referencja do canvasa renderującego particle
+
+    const workerRef = useRef<Worker | null>(null); //referencja do workera generującego cząsteczki
+    const workerRequestIdRef = useRef(0); //referencja do ID requestu wysyłanego do workera, przydatne do odróżnienia odpowiedzi, gdy jest wysyłanych wiele requestów pod rząd (np. przy szybkim refreshu snapshotu)
+
+    const timeArrayRef = useRef<number[]>([]); //referencja do tablicy czasów dla poszczególnych cząsteczek, przydatna do modyfikowania czasu życia cząsteczek w czasie rzeczywistym (np. przy zmianie efektu cząsteczek)
+    const childrenMasksRef = useRef<string[]>([]); //referencja do tablicy masek dla poszczególnych części children, przydatna do modyfikowania wyglądu cząsteczek w czasie rzeczywistym (np. przy zmianie efektu cząsteczek)
+
+    const elapsedTimeRef = useRef(0); //czas trwania animacji z uwzględnieniem ew. pauz
+    const lastFrameTimeRef = useRef<number | null>(null); //czas ostatniej klatki animacji, przydatny do obliczania deltaTime między klatkami
+    const lastMaskIndexRef = useRef(0); //indeks ostatniej użytej maski, przydatny do cyklicznego stosowania masek
+
+    const shatterFinishedCalledRef = useRef(false); //flaga do sprawdzenia, czy onShatterFinished zostało już wywołane, przydatna do uniknięcia wielokrotnego wywoływania tego callbacku, gdy wiele cząsteczek umiera w tym samym czasie
+
+    // Zmienne przeliczane
+    const isReady = Object.values(setupState).every(status => status === "ready");
+    const config: ParticleWrapperConfig = {
+        maxParticles: 1000,
+        fps: 60,
+        ...userConfig,
     };
-
     const resolvedParticleInitialState = ParticleInitialStates[particleInitialState];
     const resolvedParticleEffect = ParticleEffects[particleEffect];
 
+    const handleChildrenRef = useCallback((node: HTMLElement | null) => {
+        childrenRef.current = node;
+        setChildrenElement(node); // To informuje React: "Hej, mam już DOM!"
+    }, []);
+
+    const renderedChildren = isValidElement(children)
+        ? cloneElement(children as React.ReactElement<any>, {
+            ref: handleChildrenRef,
+        })
+        : <div ref={handleChildrenRef}>{children}</div>;
+
+
+    // funckje pomocnicze
     const clearMaskStyles = useCallback((element: HTMLElement) => {
         element.style.maskImage = "none";
         element.style.setProperty('-webkit-mask-image', 'none');
@@ -94,250 +134,54 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
         });
     }, []);
 
-    // Renderuje children do offscreen canvas za pomocą html-to-image i tworzy listę cząsteczek
-    const setupComponent = useCallback(async (element: HTMLElement) => {
-        const rect = element.getBoundingClientRect();
-        const setupSequence = setupSequenceRef.current + 1;
-        setupSequenceRef.current = setupSequence;
-
-        try {
-            // html-to-image toCanvas zwraca HTMLCanvasElement z wyrenderowanym DOM-em
-            const canvas = await toCanvas(element, {
-                width: element.offsetWidth,
-                height: element.offsetHeight,
-                pixelRatio: 1,
-            });
-
-            offscreenCanvasRef.current = canvas;
-
-            const imgWidth = canvas.width;
-            const imgHeight = canvas.height;
-
-            maskObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-            maskObjectUrlsRef.current = [];
-            elementMaskRef.current = [];
-
-            const requestId = workerRequestIdRef.current + 1;
-            workerRequestIdRef.current = requestId;
-
-            workerRef.current?.terminate();
-            workerRef.current = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
-
-            const worker = workerRef.current;
-            const workerData = await new Promise<{
-                requestId: number;
-                timeMask: number[][];
-                timeArray: number[];
-                maskBlobs: Blob[];
-                particles: Particle[];
-            }>((resolve, reject) => {
-                let finished = false;
-
-                const cleanup = () => {
-                    worker.removeEventListener("message", handleMessage);
-                    worker.removeEventListener("error", handleError);
-                };
-
-                const handleMessage = (event: MessageEvent) => {
-                    if (finished) return;
-                    const data = event.data;
-
-                    if (!data || data.type !== "SUCCESS" || data.requestId !== requestId) {
-                        return;
-                    }
-
-                    finished = true;
-                    cleanup();
-                    resolve(data);
-                };
-
-                const handleError = (errorEvent: ErrorEvent) => {
-                    if (finished) return;
-                    finished = true;
-                    cleanup();
-                    reject(errorEvent.error ?? new Error(errorEvent.message));
-                };
-
-                worker.addEventListener("message", handleMessage);
-                worker.addEventListener("error", handleError);
-                worker.postMessage({
-                    requestId,
-                    width: imgWidth,
-                    height: imgHeight,
-                    rectX: rect.x,
-                    rectY: rect.y,
-                    maxParticles: config.maxParticles,
-                    maskGeneratorName: timeMaskGenerator,
-                    particleInitialStateName: particleInitialState,
-                });
-            });
-
-            if (setupSequence !== setupSequenceRef.current || requestId !== workerRequestIdRef.current) {
-                return;
+    const revokeMaskUrls = useCallback((urls: string[]) => {
+        urls.forEach(url => {
+            if (url.startsWith("blob:")) {
+                URL.revokeObjectURL(url);
             }
-
-            timeArrayRef.current = workerData.timeArray;
-            particles.current = workerData.particles;
-
-            elementMaskRef.current = await Promise.all(workerData.maskBlobs.map(blobToDataUrl));
-            
-        } catch (err) {
-            console.error("html-to-image: nie udało się wyrenderować elementu", err);
-        }
-    }, [blobToDataUrl, config.maxParticles, timeMaskGenerator, particleInitialState]);
-
-    useEffect(() => {
-        return () => {
-            workerRef.current?.terminate();
-            workerRef.current = null;
-            maskObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-            maskObjectUrlsRef.current = [];
-        };
+        });
     }, []);
 
-    const drawParticles = useCallback((elapsedTime: number) => {
-        const canvas = canvasRef.current;
-        const offscreen = offscreenCanvasRef.current;
-        if (!canvas || !offscreen) return;
+    const drawParticles = useCallback((ctx: CanvasRenderingContext2D, elapsedTime: number) => {
+        const snapshot = snapshotRef.current;
+        if (!snapshot) return;
 
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+        // Czyścimy cały canvas przed nową klatką
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < particlesRef.current.length; i++) {
+            const p = particlesRef.current[i];
 
-        for (const particle of particles.current) {
-            if (particle.particleLife.isDead) continue;
-            if (elapsedTime < particle.particleLife.spawnTime) continue;
+            // 1. Skip if dead or not yet spawned
+            if (p.particleLife.isDead || elapsedTime < p.particleLife.spawnTime) continue;
+            if (p.particleStyle.opacity <= 0.01) continue; // nie rysuj kompletnie przezroczystych cząsteczek
 
-            ctx.globalAlpha = particle.particleStyle.opacity;
+            // 2. Set opacity for this particle
+            ctx.globalAlpha = p.particleStyle.opacity;
+
+            // 3. Draw fragment of the snapshot
+            // sX, sY, sW, sH -> źródło (snapshot)
+            // dX, dY, dW, dH -> cel (główny canvas)
             ctx.drawImage(
-                offscreen,
-                particle.particleStyle.sprite.sourceX,
-                particle.particleStyle.sprite.sourceY,
-                particle.width,
-                particle.height,
-                particle.x,
-                particle.y,
-                particle.width,
-                particle.height,
+                snapshot,
+                p.particleStyle.sprite.sourceX,
+                p.particleStyle.sprite.sourceY,
+                p.width,
+                p.height,
+                p.x,
+                p.y,
+                p.width,
+                p.height
             );
         }
 
+        // Resetujemy opacity, żeby nie wpływało na inne operacje (dobra praktyka)
         ctx.globalAlpha = 1.0;
     }, []);
 
-    // Pętla animacji
-    useEffect(() => {
-        if (!isRunning) return;
+    // UseEffecty
 
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        let lastTime = 0;
-        const interval = 1000 / config.fps;
-        let running = true;
-
-        let lastFrameTime: number | null = null;
-
-        function frame(currentTime: number) {
-            if (!running) return;
-            animationFrameRef.current = requestAnimationFrame(frame);
-
-            // Inicjalizujemy czas startu, żeby wiedzieć ile minęło sekund
-            if (lastFrameTime === null) {
-                lastFrameTime = currentTime;
-            }
-            
-            const frameDeltaTime = (currentTime - lastFrameTime) / 1000; // sekundy
-            lastFrameTime = currentTime;
-            
-            // Dodajemy czas jaki upłynął między tą a poprzednią klatką
-            elapsedTimeRef.current += frameDeltaTime;
-            const elapsedTime = elapsedTimeRef.current;
-            
-            // Podmiana maski z cache (z opóźnieniem "o jeden krok do tyłu")
-            if (childrenRef.current && timeArrayRef.current.length > 0 && lastMaskIndexRef.current <= timeArrayRef.current.length) {
-                let updatedMask = false;
-                
-                // Przesuwamy indeks tak długo, jak elapsed łapie się w progi z timeArray
-                while (lastMaskIndexRef.current < timeArrayRef.current.length && elapsedTime >= timeArrayRef.current[lastMaskIndexRef.current]) {
-                    lastMaskIndexRef.current++;
-                    updatedMask = true;
-                }
-                
-                // Ponieważ opóźniamy maskę o jeden krok (nakładamy poprzednią), musimy dorobić sztuczny krok, 
-                // aby nałożyć finalną warstwę wycięcia. Dodajemy małe opóźnienie (np. 0.05 sekundy) od ostatniej fali.
-                if (lastMaskIndexRef.current === timeArrayRef.current.length && elapsedTime >= timeArrayRef.current[lastMaskIndexRef.current - 1] + 0.05) {
-                    lastMaskIndexRef.current++;
-                    updatedMask = true;
-                }
-                
-                if (updatedMask && lastMaskIndexRef.current > 1) {
-                    // lastMaskIndexRef.current - 2 oznacza przeskoczenie "na poprzednią potencjalną maskę"
-                    const maskDataUrl = elementMaskRef.current[lastMaskIndexRef.current - 2];
-
-                    if (maskDataUrl) applyMaskStyles(childrenRef.current, maskDataUrl);
-                }
-                if (!shatterFinishedCalledRef.current && lastMaskIndexRef.current > timeArrayRef.current.length) {
-                    onShatterFinished();
-                    shatterFinishedCalledRef.current = true;
-                }
-            }
-
-            const delta = currentTime - lastTime;
-            if (delta < interval) return;
-            lastTime = currentTime;
-            const deltaSeconds = Math.min(delta / 1000, 0.1);
-
-            let allDead = true;
-
-            for (let i = 0; i < particles.current.length; i++) {
-                const p = particles.current[i];
-                
-                if (p.particleLife.isDead) continue;
-                
-                allDead = false;
-
-                if (elapsedTime >= p.particleLife.spawnTime) {
-                    resolvedParticleEffect(p, deltaSeconds);
-                }
-            }
-
-            if (allDead) {
-                running = false;
-                onEnd();
-                return;
-            }
-
-            drawParticles(elapsedTime);
-        }
-
-        animationFrameRef.current = requestAnimationFrame(frame);
-
-        return () => {
-            running = false;
-            cancelAnimationFrame(animationFrameRef.current);
-        };
-    }, [isRunning, config.fps, resolvedParticleEffect, drawParticles, onEnd, onShatterFinished]);
-
-    // Inicjalizacja cząsteczek przy montowaniu i zmianie rozmiaru okna
-    useEffect(() => {
-        if (!childrenRef.current) return;
-        
-        // Zdejmujemy maskę przed wykonaniem zrzutu html-to-image, 
-        // aby nie zapisać w pamięci przycisku, który już zniknął (to powodowało puste, przezroczyste cząsteczki)
-        clearMaskStyles(childrenRef.current);
-        
-        // Przy ponownym generowaniu cząsteczek bezpiecznie resetujemy również czasy
-        elapsedTimeRef.current = 0;
-        lastMaskIndexRef.current = 0;
-        shatterFinishedCalledRef.current = false;
-        
-        setupComponent(childrenRef.current);
-    }, [setupComponent, windowSize, clearMaskStyles]);
-
+    // Obsługa zmiany rozmiaru okna
     useEffect(() => {
         function handleResize() {
             setWindowSize({
@@ -345,23 +189,262 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
                 height: window.innerHeight,
             });
         }
-
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    function resetParticles() {
-        if (canvasRef.current) {
-            const ctx = canvasRef.current.getContext("2d");
-            if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    // Początkowy setup - tworzenie snapshotu children, generowanie timeMaski, tworzenie cząsteczek, generowanie masek dla poszczególnych części children, generowanie timeArray
+    useEffect(() => {
+        if (!childrenElement) return;
+
+        let cancelled = false;
+
+        async function setup() {
+            if (!childrenRef.current || cancelled) return;
+            const element = childrenRef.current;
+            const { x: rectX, y: rectY } = element.getBoundingClientRect();
+
+            try {
+                setSetupState(prev => ({ ...prev, snapshot: "loading" }));
+                clearMaskStyles(element);
+                const snapshot = await toCanvas(element, {
+                    width: element.offsetWidth,
+                    height: element.offsetHeight,
+                    pixelRatio: 1,
+                });
+
+                if (cancelled) return;
+
+                snapshotRef.current = snapshot;
+
+                setSetupState(prev => ({ ...prev, snapshot: "ready" }));
+                const imgWidth = snapshot.width;
+                const imgHeight = snapshot.height;
+
+
+                //zabijamy starego workera, jeśli istnieje
+                workerRef.current?.terminate();
+
+                //tworzymy nowego workera
+                const requestId = ++workerRequestIdRef.current; // inkrementujemy ID requestu
+                const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: 'module' });
+                workerRef.current = worker;
+
+                setSetupState(prev => ({
+                    ...prev,
+                    particles: "loading",
+                    childrenMasks: "loading",
+                    timeArray: "loading",
+                }));
+
+                try {
+                    const workerData = await new Promise((resolve, reject) => {
+                        const handleMessage = (e: MessageEvent) => {
+                            if (e.data.requestId !== requestId) return
+
+                            if (e.data.type === 'SUCCESS') {
+                                cleanup();
+                                resolve(e.data);
+                            }
+                        }
+
+                        const handleError = (e: ErrorEvent) => {
+                            cleanup();
+                            reject(new Error(`Worker error: ${e.message}`));
+                        }
+
+                        const cleanup = () => {
+                            worker.removeEventListener('message', handleMessage);
+                            worker.removeEventListener('error', handleError);
+                        }
+
+                        worker.addEventListener('message', handleMessage);
+                        worker.addEventListener('error', handleError);
+
+                        worker.postMessage({
+                            requestId,
+                            width: imgWidth,
+                            height: imgHeight,
+                            rectX: rectX,
+                            rectY: rectY,
+                            maxParticles: config.maxParticles,
+                            maskGeneratorName: timeMaskGenerator,
+                            particleInitialStateName: particleInitialState,
+                        } as WorkerRequest);
+                    })
+
+                    if (cancelled) return;
+
+                    const { particles, maskBlobs, timeArray } = workerData as WorkerResponse;
+
+                    particlesRef.current = particles;
+                    timeArrayRef.current = timeArray;
+
+                    if (maskBlobs) {
+                        revokeMaskUrls(childrenMasksRef.current);
+                        childrenMasksRef.current = await Promise.all(maskBlobs.map(blobToDataUrl));
+                        setSetupState(prev => ({
+                            ...prev,
+                            particles: particles ? "ready" : "error",
+                            timeArray: timeArray ? "ready" : "error",
+                            childrenMasks: "ready"
+                        }));
+                    } else {
+                        setSetupState(prev => ({ ...prev, childrenMasks: "error" }));
+                    }
+
+                } catch (error) {
+                    if (!cancelled) {
+                        setSetupState(prev => ({
+                            ...prev,
+                            particles: "error",
+                            childrenMasks: "error",
+                            timeArray: "error",
+                        }));
+                    }
+                }
+
+            } catch (error) {
+                if (!cancelled) {
+                    setSetupState(prev => ({ ...prev, snapshot: "error" }));
+                }
+            }
+        }
+        setup();
+
+        return () => {
+            cancelled = true;
+            //czyszczenie zasobów związanych z workerem i blobami
+            workerRef.current?.terminate();
+            workerRef.current = null;
+            revokeMaskUrls(childrenMasksRef.current);
+            childrenMasksRef.current = [];
+        }
+    }, [childrenElement, timeMaskGenerator, particleInitialState, config.maxParticles, clearMaskStyles, blobToDataUrl, revokeMaskUrls]);
+
+    // Animacja cząsteczek - główna pętla animacji, która aktualizuje właściwości cząsteczek na podstawie timeArray i efektu cząsteczek, a następnie renderuje je na canvasie
+    useEffect(() => {
+        if (!isRunning || !isReady) return;
+
+        let animationFrameId: number;
+
+        function frame(currentTime: number) {
+            if (lastFrameTimeRef.current === null) {
+                lastFrameTimeRef.current = currentTime;
+            }
+            const deltaTime = (currentTime - lastFrameTimeRef.current) / 1000; // w sekundach
+            lastFrameTimeRef.current = currentTime;
+            elapsedTimeRef.current += deltaTime;
+
+            const elapsedTime = elapsedTimeRef.current;
+            const canvas = canvasRef.current;
+            const ctx = canvas?.getContext("2d");
+            if (!canvas || !ctx) return;
+
+            //Aktualizacja masek
+            if (childrenRef.current && timeArrayRef.current.length > 0 && lastMaskIndexRef.current <= timeArrayRef.current.length) {
+                let maskChanged = false;
+
+                while (lastMaskIndexRef.current < timeArrayRef.current.length && elapsedTime >= timeArrayRef.current[lastMaskIndexRef.current]) {
+                    lastMaskIndexRef.current++;
+                    maskChanged = true;
+                }
+
+                if (
+                    lastMaskIndexRef.current === timeArrayRef.current.length
+                    && elapsedTime >= timeArrayRef.current[lastMaskIndexRef.current - 1] + 0.05
+                ) {
+                    lastMaskIndexRef.current++;
+                    maskChanged = true;
+                }
+
+                if (maskChanged && lastMaskIndexRef.current > 1) {
+                    const maskUrl = childrenMasksRef.current[lastMaskIndexRef.current - 2];
+                    if (maskUrl) {
+                        applyMaskStyles(childrenRef.current, maskUrl);
+                    }
+                }
+
+                if (!shatterFinishedCalledRef.current && lastMaskIndexRef.current > timeArrayRef.current.length) {
+                    shatterFinishedCalledRef.current = true;
+                    onShatterFinished();
+                }
+            }
+
+            //Aktualizacja cząsteczek
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let allDead = true; // flaga do sprawdzenia, czy wszystkie cząsteczki są martwe
+
+            if(!childrenRef.current) return;
+            const { x: rectX, y: rectY } = childrenRef.current.getBoundingClientRect(); 
+
+            particlesRef.current.forEach(particle => {
+                if (elapsedTime < particle.particleLife.spawnTime) {
+                    allDead = false;
+                    particle.originX = rectX + particle.particleStyle.sprite.sourceX;
+                    particle.originY = rectY + particle.particleStyle.sprite.sourceY;
+                    particle.x = particle.originX;
+                    particle.y = particle.originY;
+                    return; // cząsteczka jeszcze się nie pojawiła
+                }
+
+                if (particle.particleLife.isDead) return; // cząsteczka już jest martwa
+
+                allDead = false;
+                resolvedParticleEffect(particle, deltaTime);
+            });
+
+            if (allDead) {
+                setIsRunning(false);
+                onEnd();
+            } else {
+                drawParticles(ctx, elapsedTime);
+                animationFrameId = requestAnimationFrame(frame);
+            }
         }
         
+        animationFrameId = requestAnimationFrame(frame);
+
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+            lastFrameTimeRef.current = null;
+        }
+    }, [isRunning, isReady])
+
+
+    // Metody dostępne z zewnątrz przez ref
+    const start = useCallback(() => {
+        if (!isReady || isRunning) return;
+        setIsRunning(true);
+        onStart();
+    }, [isReady, isRunning, onStart]);
+
+    const stop = useCallback(() => {
+        setIsRunning(false);
+    }, []);
+
+    const reset = useCallback(() => {
+        setIsRunning(false);
         elapsedTimeRef.current = 0;
         lastMaskIndexRef.current = 0;
         shatterFinishedCalledRef.current = false;
-        
-        for (let i = 0; i < particles.current.length; i++) {
-            const p = particles.current[i];
+
+        if (childrenRef.current) {
+            clearMaskStyles(childrenRef.current);
+        }
+
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext("2d");
+            ctx?.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Przywracamy cząsteczki do ich pierwotnego stanu (resetujemy wiek, śmierć, wektory)
+        const { x: rectX, y: rectY } = childrenRef.current?.getBoundingClientRect() ?? { x: 0, y: 0 };
+
+        particlesRef.current.forEach(p => {
+            p.originX = rectX + p.particleStyle.sprite.sourceX;
+            p.originY = rectY + p.particleStyle.sprite.sourceY;
             p.x = p.originX;
             p.y = p.originY;
             p.particlePhysics.velocityX = 0;
@@ -372,45 +455,42 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
             p.particleLife.age = 0;
             p.particleStyle.opacity = 1;
             resolvedParticleInitialState(p);
-        }
-    }
+        });
 
-    useImperativeHandle(ref, () => ({
-        reset: () => {
-            setIsRunning(false);
-            if (childrenRef.current) {
-                clearMaskStyles(childrenRef.current);
-            }
-            resetParticles();
-            onReset();
-        },
-        hardReset: () => {
-            setIsRunning(false);
-            if (childrenRef.current) {
-                clearMaskStyles(childrenRef.current);
-                const element = childrenRef.current;
-                setupComponent(element);
-            }
-            onReset();
-        },
-        start: () => {
-            onStart();
-            setIsRunning(true);
-        },
-        stop: () => {
-            setIsRunning(false);
-        },
-    }), [onReset, onStart, clearMaskStyles, setupComponent, resolvedParticleInitialState]);
+        onReset();
+    }, [clearMaskStyles, resolvedParticleInitialState, onReset]);
 
-    const handleChildrenRef = useCallback((node: HTMLElement | null) => {
-        childrenRef.current = node;
+    const refreshSnapshot = useCallback(() => {
+        setIsRunning(false);
+        // Resetujemy stan konfiguracji, co ponownie wymusi wykonanie efektu "setup" 
+        // (pobranie nowego snapshotu i uruchomienie workera i reset czasu)
+        elapsedTimeRef.current = 0;
+        lastMaskIndexRef.current = 0;
+        shatterFinishedCalledRef.current = false;
+        setSetupState({
+            snapshot: "loading",
+            particles: "loading",
+            childrenMasks: "loading",
+            timeArray: "loading",
+        });
     }, []);
 
-    const renderedChildren = isValidElement(children)
-        ? cloneElement(children as React.ReactElement<any>, {
-            ref: handleChildrenRef,
-        })
-        : <div ref={handleChildrenRef}>{children}</div>;
+    const rebuild = useCallback(() => {
+        // rebuild() może działać identycznie jak refreshSnapshot w naszej implementacji,
+        // bo wywołanie efektu setup wylicza od nowa również ilość cząsteczek, tablice czasu itp.
+        refreshSnapshot();
+    }, [refreshSnapshot]);
+
+
+    useImperativeHandle(ref, () => ({
+        start,
+        stop,
+        reset,
+        refreshSnapshot,
+        rebuild,
+        isReady: () => Object.values(setupState).every(status => status === "ready"),
+        isRunning: () => isRunning,
+    }), [start, stop, reset, refreshSnapshot, rebuild, isRunning, setupState]);
 
     return (
         <div>
@@ -426,4 +506,3 @@ const ParticleWrapper = forwardRef<ParticleWrapperRef, ParticleWrapperProps>(({
 });
 
 export { ParticleWrapper };
-export default ParticleWrapper;

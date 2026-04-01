@@ -12,7 +12,6 @@ interface DevToolsProps {
     reset: () => void;
     start: () => void;
     stop: () => void;
-    hardReset: () => void;
 
     timeMaskGenerator: keyof typeof MasksGenerators;
     particleInitialState: keyof typeof ParticleInitialStates;
@@ -24,7 +23,7 @@ interface DevToolsProps {
     setParticleEffect: React.Dispatch<React.SetStateAction<keyof typeof ParticleEffects>>;
 }
 
-export function DevTools({ config, reset, start, stop, hardReset, timeMaskGenerator, particleInitialState, particleEffect, setConfig, setTimeMaskGenerator, setParticleInitialState, setParticleEffect }: DevToolsProps) {
+export function DevTools({ config, reset, start, stop, timeMaskGenerator, particleInitialState, particleEffect, setConfig, setTimeMaskGenerator, setParticleInitialState, setParticleEffect }: DevToolsProps) {
 
     const [devToolsPosition, setDevToolsPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -182,9 +181,6 @@ export function DevTools({ config, reset, start, stop, hardReset, timeMaskGenera
                         <button onClick={stop} className="dev-btn" style={{ backgroundColor: 'rgb(164, 164, 164)' }}> 
                             Stop
                         </button>
-                        <button onClick={hardReset} className="dev-btn" style={{ backgroundColor: 'rgb(144, 69, 144)' }}> 
-                            Hard Reset
-                        </button>
                     </div>
                     <div style={{paddingLeft: 10, paddingRight: 10, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 220}}>
                         {/* Ustawienia initialState */}
@@ -211,6 +207,7 @@ export function DevTools({ config, reset, start, stop, hardReset, timeMaskGenera
                                 value={particleEffect}
                                 onChange={(e) => {
                                     setParticleEffect(e.target.value as keyof typeof ParticleEffects);
+                                    reset();
                                 }}
                             >
                                 {Object.keys(ParticleEffects).map(key => (
@@ -277,6 +274,7 @@ export function DevTools({ config, reset, start, stop, hardReset, timeMaskGenera
                                 value={config.fps}
                                 onChange={(e) => {
                                     setConfig(prev => ({ ...prev, fps: Number(e.target.value) }));
+                                    reset();
                                 }}
                                 style={{ marginTop: 8 }}
                             />

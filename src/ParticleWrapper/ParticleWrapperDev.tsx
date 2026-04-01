@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import ParticleWrapper, { type ParticleWrapperRef } from "./ParticleWrapper";
+import { type ParticleWrapperRef, ParticleWrapper } from "./ParticleWrapper";
 
 import { MasksGenerators } from "./maskGenerators";
 import { ParticleInitialStates } from "./particleInitialStates";
@@ -18,6 +18,11 @@ export function ParticleWrapperDev({children}: {children: React.ReactNode}) {
     
 
     const particleWrapperRef = useRef<ParticleWrapperRef>(null);
+        const particleWrapperInstanceKey = [
+            timeMaskGenerator,
+            particleInitialState,
+            config.maxParticles,
+        ].join(":");
 
 
     return (
@@ -27,7 +32,6 @@ export function ParticleWrapperDev({children}: {children: React.ReactNode}) {
                 reset={() => particleWrapperRef.current?.reset()}
                 start={() => particleWrapperRef.current?.start()}
                 stop={() => particleWrapperRef.current?.stop()}
-                hardReset={() => particleWrapperRef.current?.hardReset()}
 
                 timeMaskGenerator={timeMaskGenerator}
                 particleInitialState={particleInitialState}
@@ -39,6 +43,7 @@ export function ParticleWrapperDev({children}: {children: React.ReactNode}) {
                 setParticleEffect={setParticleEffect}
             />
             <ParticleWrapper 
+                key={particleWrapperInstanceKey}
                 ref={particleWrapperRef}
                 config={config}
                 particleInitialState={particleInitialState}
