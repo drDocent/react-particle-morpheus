@@ -9,9 +9,8 @@ export default defineConfig({
     react(),
     dts({
       include: ['src/ParticleWrapper'],
-      tsconfigPath: './tsconfig.app.json',
+      tsConfigFilePath: './tsconfig.app.json',
       insertTypesEntry: true,
-      rollupTypes: true,
     })
   ],
   build: {
@@ -29,7 +28,8 @@ export default defineConfig({
         // Określamy zmienne globalne w razie użycia formatu UMD
         globals: {
           react: 'React',
-          'react-dom': 'ReactDOM'
+          'react-dom': 'ReactDOM',
+          'react/jsx-runtime': 'jsxRuntime'
         }
       }
     }
