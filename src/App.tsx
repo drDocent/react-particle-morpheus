@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { VaporizeDev } from './ParticleWrapper'
 import { Trash } from 'lucide-react'
 import 'overlayscrollbars/overlayscrollbars.css'; // Obowiązkowy CSS
@@ -7,6 +7,13 @@ import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 export function App() {
   const [isHovered, setIsHovered] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const [showScroll, setShowScroll] = useState(false);
+
+  useEffect(()=>{
+    setTimeout(() => {
+      setShowScroll(true);
+    }, 1000)
+  }, [])
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', flexDirection: 'row', alignItems: 'center', height: '100vh', backgroundColor: '#f7f9fc', gap: '100px' }}>
@@ -16,7 +23,8 @@ export function App() {
         <VaporizeDev>
           <div>
           <OverlayScrollbarsComponent options={{ scrollbars: { autoHide: 'never' } }} style={{ maxHeight: '500px' }}>
-            <div
+            {showScroll && (
+              <div
               style={{
                 position: 'relative',
                 width: '450px',
@@ -143,6 +151,7 @@ export function App() {
                 {inputValue ? 'Wyślij wiadomość' : 'Obserwuj'}
               </button>
             </div>
+          )}
           </OverlayScrollbarsComponent>
           </div>
         </VaporizeDev>

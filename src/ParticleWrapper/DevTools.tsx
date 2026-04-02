@@ -10,6 +10,7 @@ import type { VaporizeConfig } from "./types";
 interface DevToolsProps {
     config: VaporizeConfig;
     reset: () => void;
+    resetAll: () => void;
     start: () => void;
     stop: () => void;
     refreshSnapshot: () => void;
@@ -25,7 +26,7 @@ interface DevToolsProps {
     setParticleEffect: React.Dispatch<React.SetStateAction<keyof typeof ParticleEffects>>;
 }
 
-export function DevTools({ config, reset, start, stop, refreshSnapshot, saveSnapshot, timeMaskGenerator, particleInitialState, particleEffect, setConfig, setTimeMaskGenerator, setParticleInitialState, setParticleEffect }: DevToolsProps) {
+export function DevTools({ config, reset, resetAll, start, stop, refreshSnapshot, saveSnapshot, timeMaskGenerator, particleInitialState, particleEffect, setConfig, setTimeMaskGenerator, setParticleInitialState, setParticleEffect }: DevToolsProps) {
 
     const [devToolsPosition, setDevToolsPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -176,6 +177,9 @@ export function DevTools({ config, reset, start, stop, refreshSnapshot, saveSnap
                         `}</style>
                         <button onClick={reset} className="dev-btn" style={{ backgroundColor: 'rgb(144, 69, 69)' }}> 
                             Reset
+                        </button>
+                        <button onClick={resetAll} className="dev-btn" style={{ backgroundColor: 'rgb(180, 50, 50)' }}> 
+                            Reset All
                         </button>
                         <button onClick={start} className="dev-btn" style={{ backgroundColor: 'rgb(69, 144, 92)' }}> 
                             Start

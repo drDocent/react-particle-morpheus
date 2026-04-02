@@ -28,6 +28,7 @@ export interface VaporizeRef {
     start: () => void; // metoda do uruchomienia/wznowienia animacji cząsteczek
     stop: () => void; // metoda do zatrzymania animacji cząsteczek (pauza)
     reset: () => void; // metoda do zresetowania animacji cząsteczek (wraca do stanu początkowego)
+    resetAll: () => void; // metoda do totalnego resetu wszystkiego - wymusza ponowne zbudowanie snapshotu, cząsteczek, masek itd.
     refreshSnapshot: () => void; // metoda do odświeżenia snapshotu children (przydatne, gdy children się zmienia, ALE NIE ZMIENIA SIĘ JEGO ROZMIAR)
     rebuild: () => void; // metoda do całkowitego przebudowania cząsteczek (przydatne, gdy children się zmienia i zmienia swój rozmiar)
     saveSnapshot: (fileName?: string) => Promise<boolean>; // zapisuje aktualny snapshot html-to-image do pliku PNG
@@ -519,6 +520,39 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         refreshSnapshot();
     }, [refreshSnapshot]);
 
+    const resetAll = useCallback(() => {
+        // Totalny reset - zatrzymaj animację, wyczyść stan, wymuś ponowny setup
+        isRunningRef.current = false;
+        setIsRunning(false);
+        elapsedTimeRef.current = 0;
+        lastFrameTimeRef.current = null;
+        lastMaskIndexRef.current = 0;
+        shatterFinishedCalledRef.current = false;
+
+        if (childrenRef.current) {
+            clearMaskStyles(childrenRef.current);
+        }
+
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext("2d");
+            ctx?.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        particlesRef.current = [];
+        timeArrayRef.current = [];
+        clearMaskRefs();
+        snapshotRef.current = null;
+
+        // Wymuszamy ponowny setup przez zmianę stanu childrenElement
+        setChildrenElement(null);
+        requestAnimationFrame(() => {
+            setChildrenElement(childrenRef.current);
+        });
+
+        onReset();
+    }, [clearMaskStyles, clearMaskRefs, onReset]);
+
     const saveSnapshot = useCallback(async (fileName = "vaporize-snapshot.png") => {
         const snapshot = snapshotRef.current;
         if (!snapshot) return false;
@@ -546,12 +580,13 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         start,
         stop,
         reset,
+        resetAll,
         refreshSnapshot,
         rebuild,
         saveSnapshot,
         isReady: () => Object.values(setupState).every(status => status === "ready"),
         isRunning: () => isRunning,
-    }), [start, stop, reset, refreshSnapshot, rebuild, saveSnapshot, isRunning, setupState]);
+    }), [start, stop, reset, resetAll, refreshSnapshot, rebuild, saveSnapshot, isRunning, setupState]);
 
     return (
         <div>

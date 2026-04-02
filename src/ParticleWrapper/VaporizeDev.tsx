@@ -58,6 +58,7 @@ export function VaporizeDev({
             <DevTools
                 config={config}
                 reset={() => VaporizeRef.current?.reset()}
+                resetAll={() => VaporizeRef.current?.resetAll()}
                 start={() => VaporizeRef.current?.start()}
                 stop={() => VaporizeRef.current?.stop()}
                 refreshSnapshot={()=> VaporizeRef.current?.refreshSnapshot()}
