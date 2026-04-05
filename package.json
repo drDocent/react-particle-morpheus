@@ -1,6 +1,6 @@
 {
   "name": "react-particle-vaporize",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "React component to shatter, vaporize, or dissolve children elements into particles.",
   "type": "module",
   "main": "./dist/index.umd.cjs",
