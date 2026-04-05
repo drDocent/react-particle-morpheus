@@ -1,4 +1,4 @@
-import { VaporizeDev } from './VaporizeDev'
+import { VaporizeDev } from './VaporizeDevOld'
 
 interface StudentMockModalProps {
   isOpen: boolean

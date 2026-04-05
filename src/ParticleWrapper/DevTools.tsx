@@ -1,5 +1,5 @@
 import { Settings } from 'lucide-react';
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 import { MasksGenerators } from "./maskGenerators";
 import { ParticleInitialStates } from "./particleInitialStates";
@@ -33,6 +33,20 @@ export function DevTools({ config, reset, resetAll, start, stop, refreshSnapshot
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [isConfigOpen, setIsConfigOpen] = useState(false);
     const dragHasMoved = useRef(false);
+    const mountRef = useRef<HTMLDivElement>(null);
+    const [isInitialized, setIsInitialized] = useState(false);
+
+    useEffect(() => {
+        if (mountRef.current && !isInitialized) {
+            const rect = mountRef.current.getBoundingClientRect();
+            // Pozycja początkowa obok elementu mountRef
+            setDevToolsPosition({
+                x: rect.x + 20,
+                y: rect.y
+            });
+            setIsInitialized(true);
+        }
+    }, [isInitialized]);
 
     const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
         setIsDragging(true);
@@ -66,11 +80,16 @@ export function DevTools({ config, reset, resetAll, start, stop, refreshSnapshot
     };
 
     return (
+        <>
+        <div ref={mountRef} style={{ position: 'absolute', width: 0, height: 0 }} />
         <div style={{
-            position: 'relative',
-            transform: `translate(${devToolsPosition.x}px, ${devToolsPosition.y}px)`,
+            position: 'fixed',
+            left: `${devToolsPosition.x}px`,
+            top: `${devToolsPosition.y}px`,
             zIndex: 9999,
-            width: 'max-content'
+            width: 'max-content',
+            opacity: isInitialized ? 1 : 0,
+            pointerEvents: isInitialized ? 'auto' : 'none'
         }}>
             <button
                 onClick={handleButtonClick}
@@ -310,5 +329,6 @@ export function DevTools({ config, reset, resetAll, start, stop, refreshSnapshot
                 </div>
             )}
         </div>
+        </>
     )
 }
