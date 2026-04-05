@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { VaporizeDev } from './ParticleWrapper'
+import { useRef, useState } from 'react'
+import { Vaporize, VaporizeDev, type VaporizeRef } from './ParticleWrapper'
 import { Trash } from 'lucide-react'
 import { ParticlesProvider } from './ParticleWrapper/PariclesProvider';
 
@@ -7,6 +7,8 @@ export function App() {
   const [isHovered, setIsHovered] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isVisible, setIsVisible] = useState(true);
+
+  const vaporizeRef = useRef<VaporizeRef>(null);
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', flexDirection: 'row', alignItems: 'center', height: '100vh', backgroundColor: '#f7f9fc', gap: '100px' }}>
@@ -163,7 +165,8 @@ export function App() {
 
         {/* Kolumna 2 */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <VaporizeDev
+          <Vaporize
+            ref={vaporizeRef}
             config={{
               fps: 120,
               maxParticles: 3000
@@ -173,6 +176,7 @@ export function App() {
             timeMaskGenerator='leftToRight'
           >
             <button
+              onClick={()=>vaporizeRef.current?.start()}
               style={{
                 padding: '10px 20px',
                 backgroundColor: '#41B0FF',
@@ -186,7 +190,7 @@ export function App() {
             >
               Kliknij mnie!
             </button>
-          </VaporizeDev>
+          </Vaporize>
         </div>
       </ParticlesProvider>
     </div>

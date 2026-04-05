@@ -61,6 +61,19 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
     // Stabilne id dla tej instancji Vaporize — nie zmienia się przez cały cykl życia
     const idRef = useRef(crypto.randomUUID());
 
+    // Stabilne refy dla callbacków — zapobiega zmianie referencji funkcji co render
+    // gdy rodzic przekazuje inline funkcje np. onEnd={() => {}}
+    const onStartRef = useRef(onStart);
+    const onEndRef = useRef(onEnd);
+    const onResetRef = useRef(onReset);
+    const onShatterFinishedRef = useRef(onShatterFinished);
+    useEffect(() => {
+        onStartRef.current = onStart;
+        onEndRef.current = onEnd;
+        onResetRef.current = onReset;
+        onShatterFinishedRef.current = onShatterFinished;
+    });
+
     // Stany
     const [childrenElement, setChildrenElement] = useState<HTMLElement | null>(null);
     const [isRunning, setIsRunning] = useState(false);
@@ -87,13 +100,20 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
 
     // Zmienne przeliczane
     const isReady = Object.values(setupState).every(status => status === "ready");
+
+    // Destrukturyzacja userConfig na prymitywy — zapobiega zmianie referencji config co render
+    // gdy rodzic przekazuje inline obiekt np. config={{ maxParticles: 500 }}
+    const configMaxParticles = userConfig?.maxParticles ?? 1000;
+    const configFps = userConfig?.fps ?? 60;
+    const configAutoInitialize = userConfig?.autoInitialize ?? true;
+    const configShowLogs = userConfig?.showLogs ?? false;
+
     const config = useMemo<VaporizeConfig>(() => ({
-        maxParticles: 1000,
-        fps: 60,
-        autoInitialize: true,
-        showLogs: false,
-        ...userConfig,
-    }), [userConfig]);
+        maxParticles: configMaxParticles,
+        fps: configFps,
+        autoInitialize: configAutoInitialize,
+        showLogs: configShowLogs,
+    }), [configMaxParticles, configFps, configAutoInitialize, configShowLogs]);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const log = useCallback((...args: unknown[]) => {
@@ -190,16 +210,16 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
             onEnd: () => {
                 log('onEnd — wszystkie cząsteczki martwe');
                 setIsRunning(false);
-                onEnd();
+                onEndRef.current();
             },
             onShatter: () => {
                 log('onShatterFinished — children w pełni rozbity na cząsteczki');
-                onShatterFinished();
+                onShatterFinishedRef.current();
             },
         };
         // addGroup atomowo usuwa starą (jeśli istnieje) i wstawia nową
         addGroup(group);
-    }, [resolvedParticleEffect, handleFrame, addGroup, onEnd, onShatterFinished, log]);
+    }, [resolvedParticleEffect, handleFrame, addGroup, log]);
 
     // Cleanup przy odmontowaniu — particles żyją dalej na globalnym canvasie Providera
     useEffect(() => {
@@ -347,8 +367,8 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         log('start()');
         setIsRunning(true);
         startGroup(idRef.current);
-        onStart();
-    }, [isReady, isRunning, startGroup, onStart, log]);
+        onStartRef.current();
+    }, [isReady, isRunning, startGroup, log]);
 
     const stop = useCallback(() => {
         log('stop() — pauza');
@@ -386,8 +406,8 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
             registerGroup(particlesRef.current, snapshotRef.current);
         }
 
-        onReset();
-    }, [clearMaskStyles, resolvedParticleInitialState, registerGroup, onReset, log]);
+        onResetRef.current();
+    }, [clearMaskStyles, resolvedParticleInitialState, registerGroup, log]);
 
     const refreshSnapshot = useCallback(async () => {
         if (!childrenRef.current) return false;
@@ -443,8 +463,8 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
 
         setSetupTrigger(prev => prev + 1);
 
-        onReset();
-    }, [removeGroup, clearMaskStyles, clearMaskRefs, onReset, log]);
+        onResetRef.current();
+    }, [removeGroup, clearMaskStyles, clearMaskRefs, log]);
 
     const saveSnapshot = useCallback(async (fileName = "vaporize-snapshot.png") => {
         const snapshot = snapshotRef.current;
