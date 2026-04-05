@@ -1,3 +1,4 @@
+"use client";
 export * from './Vaporize';
 export * from './VaporizeDev';
 export * from './types';
