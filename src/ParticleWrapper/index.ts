@@ -4,3 +4,4 @@ export * from './types';
 export * from './maskGenerators';
 export * from './particleEffects';
 export * from './particleInitialStates';
+export * from './PariclesProvider';
