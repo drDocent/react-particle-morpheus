@@ -1,34 +1,29 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { VaporizeDev } from './ParticleWrapper'
 import { Trash } from 'lucide-react'
-import 'overlayscrollbars/overlayscrollbars.css'; // Obowiązkowy CSS
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 
 export function App() {
   const [isHovered, setIsHovered] = useState(false);
   const [inputValue, setInputValue] = useState('');
-  const [showScroll, setShowScroll] = useState(false);
-
-  useEffect(()=>{
-    setTimeout(() => {
-      setShowScroll(true);
-    }, 1000)
-  }, [])
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', flexDirection: 'row', alignItems: 'center', height: '100vh', backgroundColor: '#f7f9fc', gap: '100px' }}>
 
       {/* Kolumna 1 */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <VaporizeDev>
+        <VaporizeDev
+          config={{
+            maxParticles: 9000,
+            fps: 120
+          }}
+        >
           <div>
-          <OverlayScrollbarsComponent options={{ scrollbars: { autoHide: 'never' } }} style={{ maxHeight: '500px' }}>
-            {showScroll && (
-              <div
+            <div
               style={{
+                overflowY: 'auto',
                 position: 'relative',
                 width: '450px',
-                minHeight: '800px',
+                height: '80vh',
                 backgroundColor: '#ffffff',
                 borderRadius: '24px',
                 boxShadow: '0 15px 35px rgba(0, 0, 0, 0.05)',
@@ -113,7 +108,6 @@ export function App() {
                 onBlur={(e) => e.target.style.borderColor = '#eaeaea'}
                 placeholder="Napisz do mnie wiadomość..."
                 style={{
-                  marginTop: '24px',
                   padding: '12px 16px',
                   width: '100%',
                   borderRadius: '8px',
@@ -151,15 +145,21 @@ export function App() {
                 {inputValue ? 'Wyślij wiadomość' : 'Obserwuj'}
               </button>
             </div>
-          )}
-          </OverlayScrollbarsComponent>
           </div>
         </VaporizeDev>
       </div>
 
       {/* Kolumna 2 */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <VaporizeDev>
+        <VaporizeDev
+          config={{
+            fps: 120,
+            maxParticles: 3000
+          }}
+          particleInitialState='scatter'
+          particleEffect='flickerFade'
+          timeMaskGenerator='leftToRight'
+        >
           <button
             className="moving-button"
             style={{

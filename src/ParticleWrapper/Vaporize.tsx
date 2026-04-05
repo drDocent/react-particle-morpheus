@@ -30,7 +30,6 @@ export interface VaporizeRef {
     reset: () => void; // metoda do zresetowania animacji cząsteczek (wraca do stanu początkowego)
     resetAll: () => void; // metoda do totalnego resetu wszystkiego - wymusza ponowne zbudowanie snapshotu, cząsteczek, masek itd.
     refreshSnapshot: () => void; // metoda do odświeżenia snapshotu children (przydatne, gdy children się zmienia, ALE NIE ZMIENIA SIĘ JEGO ROZMIAR)
-    rebuild: () => void; // metoda do całkowitego przebudowania cząsteczek (przydatne, gdy children się zmienia i zmienia swój rozmiar)
     saveSnapshot: (fileName?: string) => Promise<boolean>; // zapisuje aktualny snapshot html-to-image do pliku PNG
 
     isReady: () => boolean; // metoda do sprawdzenia, czy cząsteczki są gotowe do startu (np. czy worker zakończył generowanie cząsteczek)
@@ -59,6 +58,7 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
     // Stany
     const [childrenElement, setChildrenElement] = useState<HTMLElement | null>(null);
     const [isRunning, setIsRunning] = useState(false);
+    const [setupTrigger, setSetupTrigger] = useState(0); // licznik wymuszający ponowny setup — inkrementowany przez resetAll()
     const [setupState, setSetupState] = useState<SetupState>({
         snapshot: "loading",
         particles: "loading",
@@ -99,9 +99,16 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
     const config = useMemo<VaporizeConfig>(() => ({
         maxParticles: 1000,
         fps: 60,
+        autoInitialize: true,
+        showLogs: false,
         ...userConfig,
     }), [userConfig]);
     const frameDuration = 1000 / config.fps;
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const log = useCallback((...args: unknown[]) => {
+        if (config.showLogs) console.log('[Vaporize]', ...args);
+    }, [config.showLogs]);
     const resolvedParticleInitialState = ParticleInitialStates[particleInitialState];
     const resolvedParticleEffect = ParticleEffects[particleEffect];
 
@@ -213,6 +220,10 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
     // Początkowy setup - tworzenie snapshotu children, generowanie timeMaski, tworzenie cząsteczek, generowanie masek dla poszczególnych części children, generowanie timeArray
     useEffect(() => {
         if (!childrenElement) return;
+        if (!config.autoInitialize && setupTrigger === 0) {
+            log('autoInitialize=false — pomijam setup, czekam na resetAll()');
+            return;
+        }
 
         let cancelled = false;
 
@@ -222,6 +233,7 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
             const { x: rectX, y: rectY } = element.getBoundingClientRect();
 
             try {
+                log('setup() start — generowanie snapshotu...');
                 setSetupState(prev => ({ ...prev, snapshot: "loading" }));
                 clearMaskStyles(element);
                 const snapshot = await toCanvas(element, {
@@ -233,6 +245,7 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
                 if (cancelled) return;
 
                 snapshotRef.current = snapshot;
+                log(`snapshot gotowy (${snapshot.width}x${snapshot.height}px)`);
 
                 setSetupState(prev => ({ ...prev, snapshot: "ready" }));
                 const imgWidth = snapshot.width;
@@ -244,6 +257,7 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
 
                 //tworzymy nowego workera
                 const requestId = ++workerRequestIdRef.current; // inkrementujemy ID requestu
+                log(`worker uruchomiony (requestId=${requestId}, maxParticles=${config.maxParticles}, maskGenerator=${timeMaskGenerator}, initialState=${particleInitialState})`);
                 const worker = new ParticleWorker();
                 workerRef.current = worker;
 
@@ -296,13 +310,18 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
                     if (cancelled) return;
 
                     const { particles, maskBlobs, timeArray } = workerData as WorkerSuccessResponse;
-
+                    log(`worker odpowiedział — cząsteczki: ${particles?.length ?? 0}, maski: ${maskBlobs?.length ?? 0}, timeArray: ${timeArray?.length ?? 0} wpisów`);
+                    log('Dane z workera:', { particles, maskBlobs, timeArray });
                     particlesRef.current = particles;
                     timeArrayRef.current = timeArray;
 
                     if (maskBlobs) {
                         clearMaskRefs();
                         childrenMasksRef.current = await Promise.all(maskBlobs.map(blobToDataUrl));
+
+                        if (cancelled) return;
+
+                        log('setup zakończony sukcesem — komponent gotowy do startu');
                         setSetupState(prev => ({
                             ...prev,
                             particles: particles ? "ready" : "error",
@@ -310,11 +329,13 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
                             childrenMasks: "ready"
                         }));
                     } else {
+                        log('BŁĄD: brak masek od workera');
                         setSetupState(prev => ({ ...prev, childrenMasks: "error" }));
                     }
 
                 } catch (error) {
                     if (!cancelled) {
+                        log('BŁĄD workera:', error);
                         setSetupState(prev => ({
                             ...prev,
                             particles: "error",
@@ -326,6 +347,7 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
 
             } catch (error) {
                 if (!cancelled) {
+                    log('BŁĄD generowania snapshotu:', error);
                     setSetupState(prev => ({ ...prev, snapshot: "error" }));
                 }
             }
@@ -339,11 +361,12 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
             workerRef.current = null;
             clearMaskRefs();
         }
-    }, [childrenElement, timeMaskGenerator, particleInitialState, config.maxParticles, clearMaskStyles, blobToDataUrl, clearMaskRefs]);
+    }, [childrenElement, setupTrigger, config.autoInitialize, timeMaskGenerator, particleInitialState, config.maxParticles, clearMaskStyles, blobToDataUrl, clearMaskRefs, log]);
 
     // Animacja cząsteczek - główna pętla animacji, która aktualizuje właściwości cząsteczek na podstawie timeArray i efektu cząsteczek, a następnie renderuje je na canvasie
     useEffect(() => {
         if (!isRunning || !isReady) return;
+        log('pętla animacji — start');
 
         let animationFrameId: number;
 
@@ -394,6 +417,7 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
 
                 if (!shatterFinishedCalledRef.current && lastMaskIndexRef.current > timeArrayRef.current.length) {
                     shatterFinishedCalledRef.current = true;
+                    log('onShatterFinished — children w pełni rozbity na cząsteczki');
                     onShatterFinished();
                 }
             }
@@ -428,6 +452,7 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
             if (allDead) {
                 // Optymalizacja #18 wyczyść ekran po skończonej bitwie gdy padną cząsteczki ;)
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+                log(`pętla animacji — koniec (elapsedTime=${elapsedTime.toFixed(2)}s), wywołuję onEnd()`);
                 isRunningRef.current = false;
                 setIsRunning(false);
                 onEnd();
@@ -442,24 +467,31 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         return () => {
             cancelAnimationFrame(animationFrameId);
             lastFrameTimeRef.current = null;
+            log('pętla animacji — cleanup (unmount / zmiana deps)');
         }
-    }, [isRunning, isReady, applyMaskStyles, drawParticles, onEnd, onShatterFinished, resolvedParticleEffect])
+    }, [isRunning, isReady, applyMaskStyles, drawParticles, onEnd, onShatterFinished, resolvedParticleEffect, frameDuration, log])
 
 
     // Metody dostępne z zewnątrz przez ref
     const start = useCallback(() => {
-        if (!isReady || isRunning) return;
+        if (!isReady || isRunning) {
+            log(`start() zignorowany — isReady=${isReady}, isRunning=${isRunning}`);
+            return;
+        }
+        log('start()');
         isRunningRef.current = true;
         setIsRunning(true);
         onStart();
-    }, [isReady, isRunning, onStart]);
+    }, [isReady, isRunning, onStart, log]);
 
     const stop = useCallback(() => {
+        log('stop() — pauza animacji');
         isRunningRef.current = false;
         setIsRunning(false);
-    }, []);
+    }, [log]);
 
     const reset = useCallback(() => {
+        log('reset() — reset stanu cząsteczek do stanu początkowego');
         isRunningRef.current = false;
         setIsRunning(false);
         elapsedTimeRef.current = 0;
@@ -489,10 +521,11 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         });
 
         onReset();
-    }, [clearMaskStyles, resolvedParticleInitialState, onReset]);
+    }, [clearMaskStyles, resolvedParticleInitialState, onReset, log]);
 
     const refreshSnapshot = useCallback(async () => {
         if (!childrenRef.current) return false;
+        log('refreshSnapshot() — odświeżanie snapshotu children');
 
         setSetupState(prev => ({ ...prev, snapshot: "loading" }));
 
@@ -511,19 +544,21 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         setSetupState(prev => ({ ...prev, snapshot: "ready" }));
 
         snapshotRef.current = snapshot;
+        log('refreshSnapshot() — nowy snapshot gotowy');
         return true;
-    }, [clearMaskStyles]);
-
-    const rebuild = useCallback(() => {
-        // rebuild() może działać identycznie jak refreshSnapshot w naszej implementacji,
-        // bo wywołanie efektu setup wylicza od nowa również ilość cząsteczek, tablice czasu itp.
-        refreshSnapshot();
-    }, [refreshSnapshot]);
+    }, [clearMaskStyles, log]);
 
     const resetAll = useCallback(() => {
-        // Totalny reset - zatrzymaj animację, wyczyść stan, wymuś ponowny setup
+        log('resetAll() — totalny reset, wymuszam ponowny setup');
+        // Totalny reset — zatrzymanie animacji, czyszczenie stanu, wymuszenie ponownego setupu
         isRunningRef.current = false;
         setIsRunning(false);
+        setSetupState({
+            snapshot: 'loading',
+            particles: 'loading',
+            childrenMasks: 'loading',
+            timeArray: 'loading',
+        });
         elapsedTimeRef.current = 0;
         lastFrameTimeRef.current = null;
         lastMaskIndexRef.current = 0;
@@ -544,18 +579,23 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         clearMaskRefs();
         snapshotRef.current = null;
 
-        // Wymuszamy ponowny setup przez zmianę stanu childrenElement
-        setChildrenElement(null);
-        requestAnimationFrame(() => {
-            setChildrenElement(childrenRef.current);
-        });
+        // Synchronicznie terminujemy workera, żeby nie zużywał CPU po resecie
+        workerRef.current?.terminate();
+        workerRef.current = null;
+
+        // Wymuszamy ponowny setup przez inkrementację triggera — pewne odpalenie useEffectu
+        setSetupTrigger(prev => prev + 1);
 
         onReset();
-    }, [clearMaskStyles, clearMaskRefs, onReset]);
+    }, [clearMaskStyles, clearMaskRefs, onReset, log]);
 
     const saveSnapshot = useCallback(async (fileName = "vaporize-snapshot.png") => {
         const snapshot = snapshotRef.current;
-        if (!snapshot) return false;
+        if (!snapshot) {
+            log('saveSnapshot() — brak snapshotu, pomijam');
+            return false;
+        }
+        log(`saveSnapshot() — zapisuję jako "${fileName}"`);
 
         const blob = await new Promise<Blob | null>((resolve) => {
             snapshot.toBlob(resolve, "image/png");
@@ -571,9 +611,10 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         link.click();
         link.remove();
         URL.revokeObjectURL(objectUrl);
+        log('saveSnapshot() — plik zapisany');
 
         return true;
-    }, []);
+    }, [log]);
 
 
     useImperativeHandle(ref, () => ({
@@ -582,11 +623,10 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         reset,
         resetAll,
         refreshSnapshot,
-        rebuild,
         saveSnapshot,
         isReady: () => Object.values(setupState).every(status => status === "ready"),
         isRunning: () => isRunning,
-    }), [start, stop, reset, resetAll, refreshSnapshot, rebuild, saveSnapshot, isRunning, setupState]);
+    }), [start, stop, reset, resetAll, refreshSnapshot, saveSnapshot, isRunning, setupState]);
 
     return (
         <div>

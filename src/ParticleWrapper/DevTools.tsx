@@ -291,6 +291,21 @@ export function DevTools({ config, reset, resetAll, start, stop, refreshSnapshot
                                 style={{ marginTop: 8 }}
                             />
                         </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10 }}>
+                            <span className="dev-label" style={{ marginBottom: 0 }}>Show Logs</span>
+                            <button
+                                onClick={() => setConfig(prev => ({ ...prev, showLogs: !prev.showLogs }))}
+                                className="dev-btn"
+                                style={{
+                                    backgroundColor: config.showLogs ? 'rgb(50, 160, 100)' : 'rgb(100, 100, 100)',
+                                    minWidth: 52,
+                                    padding: '4px 10px',
+                                    fontSize: 12,
+                                }}
+                            >
+                                {config.showLogs ? 'ON' : 'OFF'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

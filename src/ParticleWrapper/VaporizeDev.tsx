@@ -39,6 +39,8 @@ export function VaporizeDev({
     const [config, setConfig] = useState({
         fps: initialConfig?.fps ?? 120,
         maxParticles: initialConfig?.maxParticles ?? 2000,
+        autoInitialize: initialConfig?.autoInitialize ?? true,
+        showLogs: initialConfig?.showLogs ?? false,
     });
     const [timeMaskGenerator, setTimeMaskGenerator] = useState<keyof typeof MasksGenerators>( initialTimeMaskGenerator);
     const [particleInitialState, setParticleInitialState] = useState<keyof typeof ParticleInitialStates>(initialParticleInitialState);
