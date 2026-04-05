@@ -67,9 +67,10 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
     });
     // Optymalizacja #15: Zamiana useState z windowSize na useRef uniknie bezsensownych re-renderów Reacta (#15)
     // Przy resize jedynie aktualizujemy DOM canvasa, bez wymuszania regeneracji children.
+    // Inicjalizujemy 0, żeby uniknąć różnic między SSR a nawodnieniem (hydration)
     const windowSizeRef = useRef({
-        width: typeof window !== 'undefined' ? window.innerWidth : 1000,
-        height: typeof window !== 'undefined' ? window.innerHeight : 1000,
+        width: 0,
+        height: 0,
     });
 
 
@@ -196,6 +197,16 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
 
     // Obsługa zmiany rozmiaru okna
     useEffect(() => {
+        // Inicjalizujemy rozmiar po zamontowaniu (na kliencie)
+        windowSizeRef.current = {
+            width: window.innerWidth,
+            height: window.innerHeight,
+        };
+        if (canvasRef.current) {
+            canvasRef.current.width = window.innerWidth;
+            canvasRef.current.height = window.innerHeight;
+        }
+
         let timeoutId: number;
         function handleResize() {
             clearTimeout(timeoutId);
