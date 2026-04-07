@@ -1,4 +1,3 @@
-import { Settings } from 'lucide-react';
 import { useState, useRef, useEffect } from "react";
 
 import { MasksGenerators } from "./maskGenerators";
@@ -112,7 +111,9 @@ export function DevTools({ config, reset, resetAll, start, stop, refreshSnapshot
                     touchAction: 'none',
                     boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
                 }}>
-                <Settings style={{ color: 'white', width: 20, height: 20 }} />
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.34.07-.68.07-1.08s-.03-.74-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.82c-.13-.23-.43-.31-.66-.23l-2.74 1.1c-.57-.44-1.17-.81-1.84-1.08L14 2.42C13.96 2.18 13.74 2 13.5 2h-4.4c-.24 0-.46.18-.5.42L8.21 5.37C7.54 5.64 6.94 6.01 6.37 6.45L3.63 5.35c-.23-.09-.53 0-.66.23L.77 9.4c-.13.24-.07.54.13.7l2.32 1.82C3.18 12.26 3.15 12.61 3.15 13s.03.74.07 1.08L1 15.9c-.21.16-.27.46-.13.7l2.2 3.82c.13.23.43.31.66.23l2.74-1.1c.57.44 1.17.81 1.84 1.08l.38 2.95c.04.24.26.42.5.42h4.4c.24 0 .46-.18.5-.42l.38-2.95c.67-.27 1.27-.64 1.84-1.08l2.74 1.1c.23.09.53 0 .66-.23l2.2-3.82c.13-.24.07-.54-.13-.7l-2.32-1.82Z"/>
+                </svg>
 
             </button>
             {isConfigOpen && (
