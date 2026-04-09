@@ -293,24 +293,6 @@ export function DevTools({ config, reset, resetAll, start, stop, refreshSnapshot
                                 style={{ marginTop: 8 }}
                             />
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 10 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span className="dev-label" style={{ marginBottom: 0 }}>FPS</span>
-                                <span style={{ color: 'white', fontSize: 13, fontFamily: "'Segoe UI', sans-serif" }}>{config.fps}</span>
-                            </div>
-                            <input 
-                                type="range" 
-                                min="1" 
-                                max="200" 
-                                step="1" 
-                                value={config.fps}
-                                onChange={(e) => {
-                                    setConfig(prev => ({ ...prev, fps: Number(e.target.value) }));
-                                    reset();
-                                }}
-                                style={{ marginTop: 8 }}
-                            />
-                        </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10 }}>
                             <span className="dev-label" style={{ marginBottom: 0 }}>Show Logs</span>
                             <button

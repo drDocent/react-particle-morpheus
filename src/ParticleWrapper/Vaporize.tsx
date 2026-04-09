@@ -10,7 +10,7 @@ import type { WorkerRequest, WorkerSuccessResponse } from "./worker";
 import type { Particle } from "./types";
 import { useParticles, type ParticleGroup } from "./PariclesProvider";
 
-interface VaporizeProps {
+export interface VaporizeProps {
     children: React.ReactNode;
 
     config?: Partial<VaporizeConfig>;
@@ -104,16 +104,14 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
     // Destrukturyzacja userConfig na prymitywy — zapobiega zmianie referencji config co render
     // gdy rodzic przekazuje inline obiekt np. config={{ maxParticles: 500 }}
     const configMaxParticles = userConfig?.maxParticles ?? 1000;
-    const configFps = userConfig?.fps ?? 60;
     const configAutoInitialize = userConfig?.autoInitialize ?? true;
     const configShowLogs = userConfig?.showLogs ?? false;
 
     const config = useMemo<VaporizeConfig>(() => ({
         maxParticles: configMaxParticles,
-        fps: configFps,
         autoInitialize: configAutoInitialize,
         showLogs: configShowLogs,
-    }), [configMaxParticles, configFps, configAutoInitialize, configShowLogs]);
+    }), [configMaxParticles, configAutoInitialize, configShowLogs]);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const log = useCallback((...args: unknown[]) => {

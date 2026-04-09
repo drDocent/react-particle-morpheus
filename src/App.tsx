@@ -9,6 +9,7 @@ export function App() {
   const [isVisible, setIsVisible] = useState(true);
 
   const vaporizeRef = useRef<VaporizeRef>(null);
+  const vaporizeDevRef = useRef<VaporizeRef>(null);
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', flexDirection: 'row', alignItems: 'flex-end', minHeight: '200vh', backgroundColor: '#f7f9fc', gap: '100px', paddingBottom: '60px' }}>
@@ -18,9 +19,9 @@ export function App() {
         {/* Kolumna 1 */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <VaporizeDev
+            ref={vaporizeDevRef}
             config={{
               maxParticles: 9000,
-              fps: 120
             }}
             onReset={()=>{setIsVisible(true)}}
           >
@@ -166,11 +167,10 @@ export function App() {
           <Vaporize
             ref={vaporizeRef}
             config={{
-              fps: 120,
               maxParticles: 3000
             }}
-            particleInitialState='scatter'
-            particleEffect='flickerFade'
+            particleInitialState='vortex'
+            particleEffect='swirl'
             timeMaskGenerator='leftToRight'
           >
             <button

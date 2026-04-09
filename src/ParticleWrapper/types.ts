@@ -1,6 +1,5 @@
 export interface VaporizeConfig {
     maxParticles: number; // Maksymalna liczba cząsteczek, które mogą istnieć jednocześnie
-    fps: number; // Docelowa liczba klatek na sekundę dla animacji cząsteczek
     autoInitialize: boolean; // Czy komponent ma się automatycznie inicjalizować (domyślnie true). Jeśli false, trzeba wywołać resetAll()
     showLogs: boolean; // Czy wypisywać logi do konsoli (domyślnie false)
 }

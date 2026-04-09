@@ -1,32 +1,20 @@
-import { useState, useRef } from "react";
-import { type VaporizeRef, Vaporize } from "./Vaporize";
+import { useState, useRef, useImperativeHandle, forwardRef } from "react";
+import { Vaporize } from "./Vaporize";
 
 import { MasksGenerators } from "./maskGenerators";
 import { ParticleInitialStates } from "./particleInitialStates";
 import { ParticleEffects } from "./particleEffects";
 
 import { DevTools } from "./DevTools";
-import type { VaporizeConfig } from "./types";
-
+import type { VaporizeProps, VaporizeRef } from "./Vaporize";
 
 //Dodanie propsów żeby można było zmienić szybko zwykły komponent na dev i się nie jebać
-interface VaporizeProps {
+interface VaporizeDevProps extends Partial<VaporizeProps> {
     children: React.ReactNode;
-
-    config?: Partial<VaporizeConfig>;
-
-    onStart?: () => void;
-    onShatterFinished?: () => void; // wywoływane, gdy orginalny komponent będzie w pełni rozbity na cząsteczki
-    onEnd?: () => void;
-    onReset?: () => void;
-
-    timeMaskGenerator?: keyof typeof MasksGenerators; // klucz generatora maski z obiektu MasksGenerators
-    particleInitialState?: keyof typeof ParticleInitialStates; // klucz stanu początkowego z obiektu ParticleInitialStates
-    particleEffect?: keyof typeof ParticleEffects; // klucz efektu cząsteczek z obiektu ParticleEffects
 }
 
-export function VaporizeDev({
-    children, 
+export const VaporizeDev = forwardRef<VaporizeRef, VaporizeDevProps>(function VaporizeDev({
+    children,
     timeMaskGenerator: initialTimeMaskGenerator = "topLeftDiagonal",
     particleInitialState: initialParticleInitialState = "explosion",
     particleEffect: initialParticleEffect = "gravitationBottom",
@@ -35,9 +23,8 @@ export function VaporizeDev({
     onShatterFinished = () => { },
     onEnd = () => { },
     onReset = () => { },
-}: VaporizeProps) {
+}, ref) {
     const [config, setConfig] = useState({
-        fps: initialConfig?.fps ?? 120,
         maxParticles: initialConfig?.maxParticles ?? 2000,
         autoInitialize: initialConfig?.autoInitialize ?? true,
         showLogs: initialConfig?.showLogs ?? false,
@@ -48,11 +35,22 @@ export function VaporizeDev({
     
 
     const VaporizeRef = useRef<VaporizeRef>(null);
-        const VaporizeInstanceKey = [
-            timeMaskGenerator,
-            particleInitialState,
-            config.maxParticles,
-        ].join(":");
+
+    useImperativeHandle(ref, () => ({
+        start: () => { VaporizeRef.current?.start(); },
+        stop: () => { VaporizeRef.current?.stop(); },
+        reset: () => { VaporizeRef.current?.reset(); },
+        resetAll: () => { VaporizeRef.current?.resetAll(); },
+        refreshSnapshot: () => { VaporizeRef.current?.refreshSnapshot(); },
+        saveSnapshot: (fileName?: string) => VaporizeRef.current?.saveSnapshot(fileName) ?? Promise.resolve(false),
+        isReady: () => VaporizeRef.current?.isReady() ?? false,
+        isRunning: () => VaporizeRef.current?.isRunning() ?? false,
+    }), []);
+    const VaporizeInstanceKey = [
+        timeMaskGenerator,
+        particleInitialState,
+        config.maxParticles,
+    ].join(":");
 
 
     return (
@@ -92,5 +90,5 @@ export function VaporizeDev({
                 {children}
             </Vaporize>
         </>
-    )
-}
+    );
+});
