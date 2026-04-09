@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Vaporize, VaporizeDev, type VaporizeRef } from './ParticleWrapper'
 import { Trash } from 'lucide-react'
-import { ParticlesProvider } from './ParticleWrapper/PariclesProvider';
+import { MorpheusNexus } from './ParticleWrapper/PariclesProvider';
 
 export function App() {
   const [isHovered, setIsHovered] = useState(false);
@@ -12,7 +12,7 @@ export function App() {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', flexDirection: 'row', alignItems: 'flex-end', minHeight: '200vh', backgroundColor: '#f7f9fc', gap: '100px', paddingBottom: '60px' }}>
-      <ParticlesProvider
+      <MorpheusNexus
         fps={120}
       >
         {/* Kolumna 1 */}
@@ -190,7 +190,7 @@ export function App() {
             </button>
           </Vaporize>
         </div>
-      </ParticlesProvider>
+      </MorpheusNexus>
     </div>
   )
 }

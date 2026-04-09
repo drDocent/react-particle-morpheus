@@ -2,6 +2,7 @@
   "name": "react-particle-morpheus",
   "version": "1.0.1",
   "description": "React component to shatter, vaporize, or dissolve children elements into particles.",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.umd.cjs",
   "module": "./dist/index.js",

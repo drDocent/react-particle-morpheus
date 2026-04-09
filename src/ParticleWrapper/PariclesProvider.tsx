@@ -56,13 +56,13 @@ const ParticlesContext = createContext<ParticlesContextType | null>(null);
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
-interface ParticlesProviderProps {
+interface MorpheusNexusProps {
   /** Docelowe FPS animacji – ustalane raz przy montowaniu */
   fps: number;
   children: React.ReactNode;
 }
 
-export function ParticlesProvider({ fps, children }: ParticlesProviderProps) {
+export function MorpheusNexus({ fps, children }: MorpheusNexusProps) {
   const groupsRef = useRef<Map<string, ParticleGroup>>(new Map());
 
   // Trzymamy rozmiar okna w refie — bez re-renderów przy resize (jak w Vaporize)
