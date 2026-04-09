@@ -173,24 +173,6 @@ export function ParticlesProvider({ fps, children }: ParticlesProviderProps) {
     };
   }, []);
 
-  // ── Scroll handling ────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    // Inicjalizuj od razu — bez tego ref zostaje {0,0} jeśli strona jest już przewinięta
-    scrollPosRef.current = { x: window.scrollX, y: window.scrollY };
-
-    function handleScroll() {
-      scrollPosRef.current = {
-        x: window.scrollX,
-        y: window.scrollY,
-      };
-    }
-    window.addEventListener('scroll', handleScroll);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, [])
-
   // ── Pętla animacji ───────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -217,6 +199,10 @@ export function ParticlesProvider({ fps, children }: ParticlesProviderProps) {
       lastFrameTimeRef.current = timestamp - (delta % frameInterval);
 
       const deltaTimeSec = delta / 1000;
+
+      // Odczyt scrollu co klatkę — bardziej niezawodne niż event listener,
+      // szczególnie na iOS Safari gdzie eventy scroll nie nadążają za inercją
+      scrollPosRef.current = { x: window.scrollX, y: window.scrollY };
 
       // Pomiar FPS
       fpsFrames++;
