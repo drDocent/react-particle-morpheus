@@ -106,8 +106,8 @@ self.onmessage = async function (e) {
             const originX = rectX + x;
             const originY = rectY + y;
 
-            const pWidth = Math.min(pixelWidth, rectX + width - originX);
-            const pHeight = Math.min(pixelHeight, rectY + height - originY);
+            const pWidth = Math.min(pixelWidth, width - x);
+            const pHeight = Math.min(pixelHeight, height - y);
 
             const particlePhysics: ParticlePhysics = {
                 velocityX: 0,
