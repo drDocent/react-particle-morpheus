@@ -71,6 +71,10 @@ export function ParticlesProvider({ fps, children }: ParticlesProviderProps) {
     width: 0,
     height: 0,
   });
+  const scrollPosRef = useRef({
+    x: 0,
+    y: 0,
+  });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number>(0);
@@ -169,6 +173,24 @@ export function ParticlesProvider({ fps, children }: ParticlesProviderProps) {
     };
   }, []);
 
+  // ── Scroll handling ────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    // Inicjalizuj od razu — bez tego ref zostaje {0,0} jeśli strona jest już przewinięta
+    scrollPosRef.current = { x: window.scrollX, y: window.scrollY };
+
+    function handleScroll() {
+      scrollPosRef.current = {
+        x: window.scrollX,
+        y: window.scrollY,
+      };
+    }
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [])
+
   // ── Pętla animacji ───────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -221,8 +243,8 @@ export function ParticlesProvider({ fps, children }: ParticlesProviderProps) {
               p.particleStyle.sprite.sourceY,
               p.width,
               p.height,
-              p.x,
-              p.y,
+              p.x - scrollPosRef.current.x,
+              p.y - scrollPosRef.current.y,
               p.width,
               p.height,
             );
@@ -269,8 +291,8 @@ export function ParticlesProvider({ fps, children }: ParticlesProviderProps) {
             p.particleStyle.sprite.sourceY,
             p.width,
             p.height,
-            p.x,
-            p.y,
+            p.x - scrollPosRef.current.x,
+            p.y - scrollPosRef.current.y,
             p.width,
             p.height,
           );

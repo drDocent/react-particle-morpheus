@@ -11,11 +11,10 @@ export function App() {
   const vaporizeRef = useRef<VaporizeRef>(null);
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', flexDirection: 'row', alignItems: 'center', height: '100vh', backgroundColor: '#f7f9fc', gap: '100px' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', flexDirection: 'row', alignItems: 'flex-end', minHeight: '200vh', backgroundColor: '#f7f9fc', gap: '100px', paddingBottom: '60px' }}>
       <ParticlesProvider
         fps={120}
       >
-
         {/* Kolumna 1 */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <VaporizeDev
@@ -23,7 +22,6 @@ export function App() {
               maxParticles: 9000,
               fps: 120
             }}
-            onShatterFinished={()=>setIsVisible(false)}
             onReset={()=>{setIsVisible(true)}}
           >
             {isVisible && (

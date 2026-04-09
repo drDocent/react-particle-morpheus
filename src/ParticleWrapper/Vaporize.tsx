@@ -243,7 +243,6 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
         async function setup() {
             if (!childrenRef.current || cancelled) return;
             const element = childrenRef.current;
-            const { x: rectX, y: rectY } = element.getBoundingClientRect();
 
             try {
                 log('setup() start — generowanie snapshotu...');
@@ -256,6 +255,12 @@ const Vaporize = forwardRef<VaporizeRef, VaporizeProps>(({
                 });
 
                 if (cancelled) return;
+
+                // Odczyt pozycji PO await — minimalizuje ryzyko race condition gdy layout
+                // zmienia się podczas generowania snapshotu (np. załadowanie obrazka pcha element)
+                const rect = element.getBoundingClientRect();
+                const rectX = rect.x + window.scrollX;
+                const rectY = rect.y + window.scrollY;
 
                 snapshotRef.current = snapshot;
                 log(`snapshot gotowy (${snapshot.width}x${snapshot.height}px)`);
